@@ -1,6 +1,6 @@
 import { IconPickerModal } from '@/components/IconPickerModal';
 import { Colors } from '@/constants/Colors';
-import { SF_SYMBOLS } from '@/constants/SFSymbols';
+
 import { useCreateAssetWithTemplates } from '@/lib/hooks/useCreateAssetWithTemplates';
 import { Ionicons } from '@expo/vector-icons';
 import React, { useState } from 'react';
@@ -213,7 +213,6 @@ export function AddAssetModal({ visible, onClose, onSubmit }: {
         {/* Modal per selezione icona */}
         <IconPickerModal
           visible={showIconPicker}
-          category={type as keyof typeof SF_SYMBOLS}
           currentIcon={customIcon}
           onSelect={(iconKey: string) => {
             setCustomIcon(iconKey);

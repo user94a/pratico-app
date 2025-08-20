@@ -4,7 +4,7 @@ import { ConfigContext, ExpoConfig } from 'expo/config';
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: 'Pratico',
-  slug: 'pratico',
+  slug: 'pratico-app',
   version: '1.0.1',
   orientation: 'portrait',
   icon: './assets/icon.png',
@@ -45,10 +45,10 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   extra: {
     eas: {
-      projectId: 'f9b5430b-d84b-4ac2-8b92-511f932c04bb'
+      projectId: 'd377ca36-f1f2-4347-9c19-5e6027aaf727'
     },
     supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
     supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY
   },
-  owner: 'pratico-app'
+  owner: 'extendi'
 });

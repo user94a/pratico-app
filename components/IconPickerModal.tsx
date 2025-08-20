@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/Colors';
-import { SF_SYMBOLS } from '@/constants/SFSymbols';
+import { AVAILABLE_ICONS } from '@/lib/assetIcons';
 import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
 import { FlatList, Modal, Pressable, Text, View } from 'react-native';
@@ -7,14 +7,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface IconPickerModalProps {
   visible: boolean;
-  category: keyof typeof SF_SYMBOLS;
   currentIcon?: string | null;
   onSelect: (iconKey: string) => void;
   onClose: () => void;
 }
 
-export function IconPickerModal({ visible, category, currentIcon, onSelect, onClose }: IconPickerModalProps) {
-  const icons = SF_SYMBOLS[category] || SF_SYMBOLS.other;
+export function IconPickerModal({ visible, currentIcon, onSelect, onClose }: IconPickerModalProps) {
+  // Convertiamo la lista di icone in oggetti con key e name
+  const iconsList = AVAILABLE_ICONS.map(icon => ({ key: icon, name: icon }));
 
   const renderIcon = ({ item }: { item: { key: string; name: string } }) => {
     const isSelected = currentIcon === item.key;
@@ -102,7 +102,7 @@ export function IconPickerModal({ visible, category, currentIcon, onSelect, onCl
 
           {/* Griglia Icone */}
           <FlatList
-            data={icons}
+            data={iconsList}
             renderItem={renderIcon}
             keyExtractor={(item) => item.key}
             numColumns={4}

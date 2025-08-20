@@ -269,7 +269,6 @@ export function QuickCreateAssetModal({ visible, onClose, onAssetCreated }: Quic
             setShowIconPicker(false);
           }}
           currentIcon={customIcon}
-          category={type}
         />
       </SafeAreaView>
     </Modal>

@@ -1,4 +1,5 @@
 import { deleteDocument } from '@/lib/api';
+import { getAssetIcon } from '@/lib/assetIcons';
 import { supabase } from '@/lib/supabase';
 import { Document } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
@@ -123,13 +124,14 @@ function ImageViewer({ visible, images, initialIndex, onClose }: {
   );
 }
 
-export function DocumentDetailModal({ visible, onClose, document, onAssetPress, onDeadlinePress, onDelete }: {
+export function DocumentDetailModal({ visible, onClose, document, onAssetPress, onDeadlinePress, onDelete, onUpdate }: {
   visible: boolean;
   onClose: () => void;
   document: Document | null;
   onAssetPress?: (asset: any) => void;
   onDeadlinePress?: (deadline: any) => void;
   onDelete?: () => void;
+  onUpdate?: () => void;
 }) {
   const [asset, setAsset] = useState<any>(null);
   const [deadline, setDeadline] = useState<any>(null);
@@ -149,60 +151,7 @@ export function DocumentDetailModal({ visible, onClose, document, onAssetPress, 
   const [saveLoading, setSaveLoading] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
 
-  // Mapping per le icone predefinite per tipo
-  const typeIcons = {
-    // Nuove categorie
-    vehicles: 'car',
-    properties: 'home',
-    animals: 'paw',
-    people: 'person',
-    devices: 'phone-portrait',
-    subscriptions: 'card',
-    other: 'cube',
-    // Retrocompatibilità con vecchie categorie
-    car: 'car',
-    house: 'home'
-  } as const;
 
-  // Helper per ottenere l'icona da mostrare
-  function getAssetIcon(asset: any): string {
-    // Se ha un'icona personalizzata, usala con fallback
-    if (asset?.custom_icon && typeof asset.custom_icon === 'string') {
-      // Lista di icone valide per fallback
-      const validIcons = [
-        'car', 'home', 'paw', 'person', 'phone-portrait', 'card', 'cube', 
-        'boat', 'bicycle', 'airplane', 'train', 'bus', 'medical', 'business',
-        'restaurant', 'school', 'fitness', 'camera', 'laptop', 'watch'
-      ];
-      
-      // Se l'icona personalizzata è valida, usala, altrimenti fallback
-      if (validIcons.includes(asset.custom_icon)) {
-        return asset.custom_icon;
-      } else {
-        // Fallback per icone non valide
-        const fallbackMap: Record<string, string> = {
-          'hospital': 'medical',
-          'building': 'business', 
-          'factory': 'business',
-          'office': 'business',
-          'bank': 'business',
-          'store': 'business'
-        };
-        const fallbackIcon = fallbackMap[asset.custom_icon];
-        if (fallbackIcon && validIcons.includes(fallbackIcon)) {
-          return fallbackIcon;
-        }
-      }
-    }
-    
-    // Fallback all'icona predefinita per il tipo
-    if (asset?.type && typeIcons[asset.type as keyof typeof typeIcons]) {
-      return typeIcons[asset.type as keyof typeof typeIcons];
-    }
-    
-    // Ultimo fallback
-    return typeIcons.other;
-  }
 
   useEffect(() => {
     async function load() {
@@ -219,7 +168,7 @@ export function DocumentDetailModal({ visible, onClose, document, onAssetPress, 
       // Inizializza valori di editing
       setEditTitle(document.title);
       setEditTags(document.tags?.join(', ') || '');
-      setEditDescription((document as any).description || '');
+      setEditDescription((document as any).description || (document as any).description === '' ? '' : ((document as any).description ?? ''));
 
       try {
         // Carica bene associato
@@ -383,7 +332,8 @@ export function DocumentDetailModal({ visible, onClose, document, onAssetPress, 
 
       Alert.alert('Successo', 'Documento aggiornato');
       setIsEditing(false);
-      // Ricarica i dati
+      // Notifica il parent per ricaricare i dati
+      onUpdate?.();
       onClose();
     } catch (error) {
       Alert.alert('Errore', 'Impossibile salvare le modifiche');
@@ -849,7 +799,7 @@ export function DocumentDetailModal({ visible, onClose, document, onAssetPress, 
               )}
 
               {/* Descrizione in visualizzazione */}
-              {(document as any).description && !isEditing && (
+              {((document as any).description) && !isEditing && (
                 <View>
                   <Text style={{ fontWeight: '600', marginBottom: 8 }}>Descrizione</Text>
                   <Text style={{ color: '#666', lineHeight: 20 }}>{(document as any).description}</Text>

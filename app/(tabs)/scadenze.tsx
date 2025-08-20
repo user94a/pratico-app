@@ -35,6 +35,65 @@ function getDeadlineStatus(deadline: Deadline) {
   return null;
 }
 
+// Funzione per convertire le regole RRULE in testo leggibile
+function getRecurrenceText(rrule: string): string {
+  if (!rrule) return 'Ricorrente';
+  
+  // Mappa delle regole comuni
+  const recurrenceMap: { [key: string]: string } = {
+    'RRULE:FREQ=WEEKLY': 'Ogni settimana',
+    'RRULE:FREQ=MONTHLY': 'Ogni mese',
+    'RRULE:FREQ=MONTHLY;INTERVAL=3': 'Ogni 3 mesi',
+    'RRULE:FREQ=MONTHLY;INTERVAL=6': 'Ogni 6 mesi',
+    'RRULE:FREQ=YEARLY': 'Ogni anno',
+    'RRULE:FREQ=YEARLY;INTERVAL=2': 'Ogni 2 anni',
+  };
+  
+  // Controlla se corrisponde a una regola mappata
+  if (recurrenceMap[rrule]) {
+    return recurrenceMap[rrule];
+  }
+  
+  // Parsing più generico per altre regole
+  try {
+    if (rrule.includes('FREQ=DAILY')) {
+      if (rrule.includes('INTERVAL=')) {
+        const interval = rrule.match(/INTERVAL=(\d+)/)?.[1];
+        return interval ? `Ogni ${interval} giorni` : 'Ogni giorno';
+      }
+      return 'Ogni giorno';
+    }
+    
+    if (rrule.includes('FREQ=WEEKLY')) {
+      if (rrule.includes('INTERVAL=')) {
+        const interval = rrule.match(/INTERVAL=(\d+)/)?.[1];
+        return interval ? `Ogni ${interval} settimane` : 'Ogni settimana';
+      }
+      return 'Ogni settimana';
+    }
+    
+    if (rrule.includes('FREQ=MONTHLY')) {
+      if (rrule.includes('INTERVAL=')) {
+        const interval = rrule.match(/INTERVAL=(\d+)/)?.[1];
+        return interval ? `Ogni ${interval} mesi` : 'Ogni mese';
+      }
+      return 'Ogni mese';
+    }
+    
+    if (rrule.includes('FREQ=YEARLY')) {
+      if (rrule.includes('INTERVAL=')) {
+        const interval = rrule.match(/INTERVAL=(\d+)/)?.[1];
+        return interval ? `Ogni ${interval} anni` : 'Ogni anno';
+      }
+      return 'Ogni anno';
+    }
+  } catch (error) {
+    console.warn('Error parsing RRULE:', rrule, error);
+  }
+  
+  return 'Ricorrente';
+}
+
 export default function Scadenze() {
   const [items, setItems] = useState<Deadline[]>([]);
   const [loading, setLoading] = useState(true);
@@ -271,7 +330,7 @@ export default function Scadenze() {
                   fontWeight: '600',
                   color: Colors.light.warning
                 }}>
-                  RICORRENTE
+                  {getRecurrenceText(item.recurrence_rrule).toUpperCase()}
                 </Text>
               </View>
             )}

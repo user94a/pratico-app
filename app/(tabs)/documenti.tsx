@@ -4,6 +4,7 @@ import { DeadlineDetailModal } from '@/components/modals/DeadlineDetailModal';
 import { DocumentDetailModal } from '@/components/modals/DocumentDetailModal';
 import { Colors } from '@/constants/Colors';
 import { createDocumentWithAssociations, getDocuments } from '@/lib/api';
+import { getAssetIcon } from '@/lib/assetIcons';
 import { Document } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
@@ -47,146 +48,14 @@ export default function Documenti() {
     return titleMatch || tagMatch || assetMatch;
   });
 
-  // Funzione per determinare la categoria del documento
-  function getDocumentCategory(document: Document): string {
-    // Se ha tag, usa il primo tag come categoria
-    if (document.tags && document.tags.length > 0) {
-      return document.tags[0].toLowerCase();
-    }
-    
-    // Altrimenti usa una categoria generica basata sul tipo di file
-    if (document.storage_path) {
-      const extension = document.storage_path.toLowerCase().split('.').pop();
-      if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(extension || '')) {
-        return 'immagini';
-      }
-      if (['pdf'].includes(extension || '')) {
-        return 'pdf';
-      }
-      if (['doc', 'docx'].includes(extension || '')) {
-        return 'documenti';
-      }
-    }
-    
-    return 'altro';
-  }
+  // Ordina i documenti per data di creazione (più recenti prima)
+  const sortedDocuments = filteredItems.sort((a, b) => 
+    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
 
-  // Raggruppa i documenti per categoria
-  const groupedDocuments = filteredItems.reduce((groups, document) => {
-    const category = getDocumentCategory(document);
-    if (!groups[category]) {
-      groups[category] = [];
-    }
-    groups[category].push(document);
-    return groups;
-  }, {} as Record<string, typeof filteredItems>);
 
-  // Ordina le categorie per numero di documenti (decrescente) e poi alfabeticamente
-  const sortedCategories = Object.keys(groupedDocuments).sort((a, b) => {
-    const countDiff = groupedDocuments[b].length - groupedDocuments[a].length;
-    if (countDiff !== 0) return countDiff;
-    return a.localeCompare(b);
-  });
 
-  // Mapping per le icone predefinite per tipo
-  const typeIcons = {
-    // Nuove categorie
-    vehicles: 'car',
-    properties: 'home',
-    animals: 'paw',
-    people: 'person',
-    devices: 'phone-portrait',
-    subscriptions: 'card',
-    other: 'cube',
-    // Retrocompatibilità con vecchie categorie
-    car: 'car',
-    house: 'home'
-  } as const;
 
-  // Helper per ottenere l'icona da mostrare
-  function getAssetIcon(asset: any): string {
-    // Se ha un'icona personalizzata, usala con fallback
-    if (asset?.custom_icon && typeof asset.custom_icon === 'string') {
-      // Lista di icone valide per fallback
-      const validIcons = [
-        'car', 'home', 'paw', 'person', 'phone-portrait', 'card', 'cube', 
-        'boat', 'bicycle', 'airplane', 'train', 'bus', 'medical', 'business',
-        'restaurant', 'school', 'fitness', 'camera', 'laptop', 'watch'
-      ];
-      
-      // Se l'icona personalizzata è valida, usala, altrimenti fallback
-      if (validIcons.includes(asset.custom_icon)) {
-        return asset.custom_icon;
-      } else {
-        // Fallback per icone non valide
-        const fallbackMap: Record<string, string> = {
-          'hospital': 'medical',
-          'building': 'business', 
-          'factory': 'business',
-          'office': 'business',
-          'bank': 'business',
-          'store': 'business'
-        };
-        const fallbackIcon = fallbackMap[asset.custom_icon];
-        if (fallbackIcon && validIcons.includes(fallbackIcon)) {
-          return fallbackIcon;
-        }
-      }
-    }
-    
-    // Fallback all'icona predefinita per il tipo
-    if (asset?.type && typeIcons[asset.type as keyof typeof typeIcons]) {
-      return typeIcons[asset.type as keyof typeof typeIcons];
-    }
-    
-    // Ultimo fallback
-    return typeIcons.other;
-  }
-
-  // Componente per le sezioni dei documenti
-  function DocumentSection({ title, documents }: { title: string; documents: typeof filteredItems }) {
-    if (documents.length === 0) return null;
-    
-    return (
-      <View style={{ marginBottom: 24 }}>
-        <Text style={{ 
-          fontSize: 16, 
-          fontWeight: '600', 
-          color: Colors.light.text,
-          marginBottom: 12,
-          marginLeft: 4
-        }}>
-          {title.charAt(0).toUpperCase() + title.slice(1)}
-        </Text>
-        <View style={{
-          backgroundColor: Colors.light.cardBackground,
-          borderRadius: 16,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.05,
-          shadowRadius: 1,
-          elevation: 1,
-        }}>
-          {documents.map((document, index) => {
-            const isLast = index === documents.length - 1;
-  return (
-              <View key={document.id}>
-                {renderDocument({ item: document })}
-                {!isLast && (
-                  <View style={{
-                    height: 0.5,
-                    backgroundColor: Colors.light.border,
-                    marginLeft: 0,
-                    marginRight: 0
-                  }} />
-                )}
-              </View>
-            );
-          })}
-        </View>
-      </View>
-    );
-  }
 
   const renderDocument = ({ item }: { item: Document }) => (
     <Pressable
@@ -377,7 +246,7 @@ export default function Documenti() {
           contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 16 }}
           showsVerticalScrollIndicator={false}
         >
-          {Object.keys(groupedDocuments).length === 0 ? (
+          {sortedDocuments.length === 0 ? (
             <View style={{ 
               flex: 1, 
               alignItems: 'center', 
@@ -406,18 +275,33 @@ export default function Documenti() {
               )}
             </View>
           ) : (
-            sortedCategories.map((category) => {
-              const documents = groupedDocuments[category];
-              if (!documents || documents.length === 0) return null;
-              
-              return (
-                <DocumentSection 
-                  key={category} 
-                  title={category} 
-                  documents={documents} 
-          />
-              );
-            })
+            <View style={{
+              backgroundColor: Colors.light.cardBackground,
+              borderRadius: 16,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.05,
+              shadowRadius: 1,
+              elevation: 1,
+              marginBottom: 24
+            }}>
+              {sortedDocuments.map((document, index) => {
+                const isLast = index === sortedDocuments.length - 1;
+                return (
+                  <View key={document.id}>
+                    {renderDocument({ item: document })}
+                    {!isLast && (
+                      <View style={{
+                        height: 0.5,
+                        backgroundColor: Colors.light.border,
+                        marginLeft: 0,
+                        marginRight: 0
+                      }} />
+                    )}
+                  </View>
+                );
+              })}
+            </View>
           )}
         </ScrollView>
       </View>
@@ -448,6 +332,10 @@ export default function Documenti() {
             visible={!!selectedDocument}
             onClose={() => setSelectedDocument(null)}
             document={selectedDocument}
+          onUpdate={async () => {
+            // Ricarica la lista dei documenti dopo la modifica
+            await load();
+          }}
           onDelete={async () => {
             // Ricarica la lista dei documenti dopo l'eliminazione
             await load();

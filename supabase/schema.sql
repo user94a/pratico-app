@@ -78,7 +78,9 @@ create table if not exists public.documents (
   title text not null,
   tags text[],
   storage_path text, -- path in storage bucket
-  created_at timestamptz not null default now()
+  description text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 alter table public.documents enable row level security;

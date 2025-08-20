@@ -1,6 +1,5 @@
 import { IconPickerModal } from '@/components/IconPickerModal';
 import { Colors } from '@/constants/Colors';
-import { SF_SYMBOLS } from '@/constants/SFSymbols';
 import { updateAsset } from '@/lib/api';
 import { Asset } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
@@ -228,7 +227,6 @@ export function EditAssetModal({ visible, onClose, asset, onUpdate }: {
         {/* Modal per selezione icona */}
         <IconPickerModal
           visible={showIconPicker}
-          category={type as keyof typeof SF_SYMBOLS}
           currentIcon={customIcon}
           onSelect={(iconKey: string) => {
             setCustomIcon(iconKey);

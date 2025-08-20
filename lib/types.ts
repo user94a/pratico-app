@@ -1,9 +1,10 @@
 export type Asset = {
   id: string;
-  type: 'vehicles' | 'properties' | 'animals' | 'people' | 'devices' | 'subscriptions' | 'other';
+  type: 'vehicle' | 'home' | 'device' | 'appliance' | 'animal' | 'person' | 'subscription' | 'property' | 'investment' | 'other';
   name: string;
   identifier: string | null;
   custom_icon: string | null;
+  template_key: string | null; // Nuovo campo per il template del bene
   created_at: string;
   updated_at: string;
 };
@@ -33,5 +34,6 @@ export type Document = {
   asset?: { name: string; type?: string; custom_icon?: string | null } | null;
   created_at: string;
   updated_at: string;
+  description?: string | null;
   user_id?: string;
 }; 

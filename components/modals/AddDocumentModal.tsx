@@ -9,7 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import React, { useCallback, useState } from 'react';
 import { ActionSheetIOS, Alert, FlatList, Image, Modal, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { QuickCreateAssetModal } from './QuickCreateAssetModal';
+
 
 export interface AddDocumentModalRef {
   resetLoading: () => void;
@@ -33,11 +33,7 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
       name: string;
       type: string;
     }>;
-    newAsset?: {
-      name: string;
-      type: 'vehicles' | 'properties' | 'animals' | 'people' | 'devices' | 'subscriptions' | 'other';
-      identifier?: string;
-    };
+
     associatedDeadline?: {
       title: string;
       dueAt: string;
@@ -75,7 +71,7 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Stati per le modali di creazione rapida
-  const [showQuickCreateAsset, setShowQuickCreateAsset] = useState(false);
+
 
   // Stati per il loading
   const [isCreating, setIsCreating] = useState(false);
@@ -116,12 +112,12 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
     setSelectedAsset(newAsset);
     setAssetType('existing');
     // Chiude la modale di creazione rapida
-    setShowQuickCreateAsset(false);
+
   }
 
   function handleAssetCreationCancelled() {
     // Chiude la modale di creazione rapida senza creare
-    setShowQuickCreateAsset(false);
+
     // Se non c'è un asset selezionato, disattiva lo switch
     if (!selectedAsset) {
       setHasAsset(false);
@@ -132,7 +128,7 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
         {
-          options: ['Annulla', 'Scatta foto', 'Scatta più foto', 'Galleria', 'Documenti'],
+          options: ['Annulla', 'Scatta foto', 'Galleria', 'Documenti'],
           cancelButtonIndex: 0,
         },
         async (buttonIndex) => {
@@ -140,9 +136,6 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
             // Scatta una foto singola
             await takeSinglePhoto();
           } else if (buttonIndex === 2) {
-            // Scatta foto multiple
-            await takeMultiplePhotos();
-          } else if (buttonIndex === 3) {
             // Galleria - supporto foto multiple
             const result = await ImagePicker.launchImageLibraryAsync({
               mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -160,7 +153,7 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
               setSelectedFiles(prev => [...prev, ...newFiles]);
               setPreviewUrls(prev => [...prev, ...newUrls]);
             }
-          } else if (buttonIndex === 4) {
+          } else if (buttonIndex === 3) {
             // Documenti - supporto file multipli
             const result = await DocumentPicker.getDocumentAsync({
               type: ['application/pdf', 'image/*'],
@@ -192,10 +185,6 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
           { 
             text: 'Scatta foto', 
             onPress: () => takeSinglePhoto()
-          },
-          { 
-            text: 'Scatta più foto', 
-            onPress: () => takeMultiplePhotos()
           },
           { 
             text: 'Galleria', 
@@ -270,59 +259,6 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
     }
   }
 
-  async function takeMultiplePhotos() {
-    // Richiedi permessi camera
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permesso richiesto', 'È necessario il permesso della fotocamera per scattare foto.');
-      return;
-    }
-
-    let shouldContinue = true;
-    while (shouldContinue) {
-      const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false,
-        quality: 0.8,
-      });
-      
-      if (!result.canceled && result.assets[0]) {
-        const asset = result.assets[0];
-        const newFile = { 
-          uri: asset.uri, 
-          name: asset.fileName || `photo-${Date.now()}.jpg`, 
-          type: asset.type || 'image/jpeg' 
-        };
-        setSelectedFiles(prev => [...prev, newFile]);
-        setPreviewUrls(prev => [...prev, asset.uri]);
-
-        // Chiedi se vuole scattare un'altra foto
-        await new Promise<void>((resolve) => {
-          Alert.alert(
-            'Foto aggiunta!',
-            'Vuoi scattare un\'altra foto?',
-            [
-              { 
-                text: 'No, basta così', 
-                style: 'cancel',
-                onPress: () => {
-                  shouldContinue = false;
-                  resolve();
-                }
-              },
-              { 
-                text: 'Sì, un\'altra foto', 
-                onPress: () => resolve()
-              }
-            ]
-          );
-        });
-      } else {
-        shouldContinue = false;
-      }
-    }
-  }
-
   function reset() {
     setTitle('');
     setTags('');
@@ -382,7 +318,6 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
       title: title.trim(),
       tags: tags.trim() || undefined,
       assetId: hasAsset && assetType === 'existing' ? selectedAsset?.id : undefined,
-      newAsset,
       storagePath: undefined,
       filesInfo: selectedFiles.length > 0 ? selectedFiles : undefined,
       associatedDeadline
@@ -1077,22 +1012,7 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <Text style={{ fontSize: 20, fontWeight: '700' }}>Seleziona bene</Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Pressable
-                    onPress={() => {
-                      setShowAssetPicker(false);
-                      setShowQuickCreateAsset(true);
-                    }}
-                    style={{ 
-                      width: 36,
-                      height: 36,
-                      backgroundColor: '#0a84ff',
-                      borderRadius: 18,
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <Ionicons name="add" size={20} color="#fff" />
-                  </Pressable>
+
                   <Pressable 
                     onPress={() => {
                       setShowAssetPicker(false);
@@ -1138,12 +1058,12 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
                 >
                   <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: Colors.light.tint, alignItems: 'center', justifyContent: 'center' }}>
                     <Ionicons name={
-                      item.type === 'vehicles' ? 'car' : 
-                      item.type === 'properties' ? 'home' : 
-                      item.type === 'animals' ? 'paw' :
-                      item.type === 'people' ? 'person' :
-                      item.type === 'devices' ? 'phone-portrait' :
-                      item.type === 'subscriptions' ? 'card' :
+                      item.type === 'vehicle' ? 'car' : 
+                      item.type === 'property' || item.type === 'home' ? 'home' : 
+                      item.type === 'animal' ? 'paw' :
+                      item.type === 'person' ? 'person' :
+                      item.type === 'device' ? 'phone-portrait' :
+                      item.type === 'subscription' ? 'card' :
                       'cube'
                     } size={20} color={'#fff'} />
                   </View>
@@ -1162,12 +1082,7 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
           </SafeAreaView>
         </Modal>
 
-        {/* Modale di creazione rapida asset */}
-        <QuickCreateAssetModal
-          visible={showQuickCreateAsset}
-          onClose={handleAssetCreationCancelled}
-          onAssetCreated={handleAssetCreated}
-        />
+
 
         {/* Modale di loading */}
         <Modal 

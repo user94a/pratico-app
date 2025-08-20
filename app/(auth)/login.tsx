@@ -1,44 +1,57 @@
+import { Colors } from '@/constants/Colors';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, Text, TextInput, View } from 'react-native';
+import {
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    Pressable,
+    SafeAreaView,
+    ScrollView,
+    Text,
+    TextInput,
+    View
+} from 'react-native';
 import { supabase } from '../../lib/supabase';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState<'in' | 'up' | 'reset' | null>(null);
+  const [loading, setLoading] = useState<'in' | 'reset' | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function signIn() {
-    if (!email || !password) return Alert.alert('Compila email e password');
+    console.log('signIn called with:', { email, password: password ? '***' : 'empty' });
+    
+    if (!email || !password) {
+      console.log('Validation failed - missing email or password');
+      return Alert.alert('Errore', 'Compila email e password');
+    }
+    
     try {
+      console.log('Starting login process...');
       setLoading('in');
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) throw error;
-      // onAuthStateChange in app/index.tsx farà il redirect a /home
+      if (error) {
+        console.log('Supabase error:', error);
+        throw error;
+      }
+      console.log('Login successful');
+      // onAuthStateChange in app/index.tsx farà il redirect, ma aggiungiamo un backup
+      setTimeout(() => {
+        router.replace('/(tabs)/scadenze');
+      }, 100);
     } catch (e: any) {
+      console.log('Login error:', e);
       Alert.alert('Errore accesso', e.message);
     } finally {
       setLoading(null);
     }
   }
 
-  async function signUp() {
-    if (!email || !password) return Alert.alert('Compila email e password');
-    try {
-      setLoading('up');
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
-      if (error) throw error;
-      Alert.alert('Codice inviato', 'Controlla la tua email: inserisci il codice di 6 cifre per confermare l\'account.');
-      router.push({ pathname: '/reset-with-code', params: { email, flow: 'signup' } });
-    } catch (e: any) {
-      Alert.alert('Errore registrazione', e.message);
-    } finally {
-      setLoading(null);
-    }
-  }
+
 
   async function resetPassword() {
     if (!email) return Alert.alert('Inserisci l\'email', 'Inserisci l\'indirizzo email per reimpostare la password.');
@@ -61,57 +74,188 @@ export default function Login() {
   }
 
   return (
-    <View style={{ flex: 1, padding: 24, gap: 12, justifyContent: 'center' }}>
-      <Text style={{ fontSize: 34, fontWeight: '800', marginBottom: 8 }}>Accedi</Text>
-
-      <TextInput
-        placeholder="Email"
-        autoCapitalize="none"
-        keyboardType="email-address"
-        value={email}
-        onChangeText={setEmail}
-        style={{ borderWidth: 1, borderColor: '#d1d1d6', borderRadius: 12, padding: 12 }}
-      />
-
-      <TextInput
-        placeholder="Password"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        style={{ borderWidth: 1, borderColor: '#d1d1d6', borderRadius: 12, padding: 12 }}
-      />
-
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Pressable
-          onPress={resetPassword}
-          disabled={loading !== null}
-          style={{ paddingVertical: 4 }}
-        >
-          <Text style={{ color: '#0a84ff', fontWeight: '600' }}>
-            Password dimenticata? (Codice)
-          </Text>
-        </Pressable>
-      </View>
-
-      <Pressable
-        onPress={signIn}
-        disabled={loading !== null}
-        style={{ backgroundColor: '#0a84ff', padding: 14, borderRadius: 12, opacity: loading ? 0.7 : 1 }}
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.light.background }}>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        {loading === 'in' ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '600' }}>Accedere</Text>
-        )}
-      </Pressable>
+        <ScrollView 
+          style={{ flex: 1 }} 
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={{ flex: 1, padding: 24, justifyContent: 'center' }}>
+            {/* Header con logo */}
+            <View style={{ alignItems: 'center', marginBottom: 32 }}>
+              <View style={{
+                width: 80,
+                height: 80,
+                borderRadius: 20,
+                backgroundColor: Colors.light.tint,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 16
+              }}>
+                <Ionicons name="cube" size={40} color="#fff" />
+              </View>
+              <Text style={{ 
+                fontSize: 32, 
+                fontWeight: '800', 
+                color: Colors.light.text,
+                marginBottom: 8
+              }}>
+                Benvenuto
+              </Text>
+              <Text style={{ 
+                fontSize: 16, 
+                color: Colors.light.textSecondary,
+                textAlign: 'center'
+              }}>
+                Accedi al tuo account
+              </Text>
+            </View>
 
-      <Pressable onPress={signUp} disabled={loading !== null} style={{ padding: 14 }}>
-        {loading === 'up' ? (
-          <ActivityIndicator />
-        ) : (
-          <Text style={{ textAlign: 'center', fontWeight: '600' }}>Creare un account</Text>
-        )}
-      </Pressable>
-    </View>
+            {/* Form */}
+            <View style={{ gap: 16 }}>
+              {/* Email */}
+              <View>
+                <Text style={{ 
+                  fontSize: 14, 
+                  fontWeight: '600', 
+                  color: Colors.light.text,
+                  marginBottom: 8 
+                }}>
+                  Email
+                </Text>
+                <TextInput
+                  placeholder="la-tua-email@esempio.com"
+                  autoCapitalize="none"
+                  keyboardType="email-address"
+                  value={email}
+                  onChangeText={setEmail}
+                  style={{
+                    backgroundColor: '#fff',
+                    borderWidth: 1,
+                    borderColor: '#e1e1e6',
+                    borderRadius: 12,
+                    padding: 16,
+                    fontSize: 16
+                  }}
+                />
+              </View>
+
+              {/* Password */}
+              <View>
+                <Text style={{ 
+                  fontSize: 14, 
+                  fontWeight: '600', 
+                  color: Colors.light.text,
+                  marginBottom: 8 
+                }}>
+                  Password
+                </Text>
+                <View style={{ position: 'relative' }}>
+                  <TextInput
+                    placeholder="La tua password"
+                    secureTextEntry={!showPassword}
+                    value={password}
+                    onChangeText={setPassword}
+                    style={{
+                      backgroundColor: '#fff',
+                      borderWidth: 1,
+                      borderColor: '#e1e1e6',
+                      borderRadius: 12,
+                      padding: 16,
+                      paddingRight: 50,
+                      fontSize: 16
+                    }}
+                  />
+                  <Pressable
+                    onPress={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: 16,
+                      top: 16,
+                      padding: 4
+                    }}
+                  >
+                    <Ionicons 
+                      name={showPassword ? 'eye-off' : 'eye'} 
+                      size={20} 
+                      color={Colors.light.textSecondary} 
+                    />
+                  </Pressable>
+                </View>
+              </View>
+
+              {/* Password dimenticata */}
+              <View style={{ alignItems: 'flex-end' }}>
+                <Pressable
+                  onPress={resetPassword}
+                  disabled={loading !== null}
+                  style={{ paddingVertical: 4 }}
+                >
+                  <Text style={{ color: Colors.light.tint, fontWeight: '600' }}>
+                    Password dimenticata?
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+
+            {/* Pulsanti */}
+            <View style={{ gap: 12, marginTop: 32 }}>
+              <Pressable
+                onPress={() => {
+                  console.log('Login button pressed');
+                  signIn();
+                }}
+                disabled={loading !== null}
+                style={{
+                  backgroundColor: loading ? '#80a8ff' : Colors.light.tint,
+                  padding: 16,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  opacity: loading ? 0.8 : 1
+                }}
+              >
+                {loading === 'in' ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={{
+                    color: '#fff',
+                    fontSize: 16,
+                    fontWeight: '600'
+                  }}>
+                    Accedi
+                  </Text>
+                )}
+              </Pressable>
+
+              <Pressable
+                onPress={() => router.push('/signup')}
+                disabled={loading !== null}
+                style={{
+                  backgroundColor: '#fff',
+                  padding: 16,
+                  borderRadius: 12,
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: '#e1e1e6',
+                  opacity: loading ? 0.5 : 1
+                }}
+              >
+                <Text style={{
+                  color: Colors.light.tint,
+                  fontSize: 16,
+                  fontWeight: '600'
+                }}>
+                  Crea Account
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }

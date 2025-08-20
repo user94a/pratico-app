@@ -9,7 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import React, { useCallback, useState } from 'react';
 import { ActionSheetIOS, Alert, FlatList, Image, Modal, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { QuickCreateAssetModal } from './QuickCreateAssetModal';
+
 import { QuickCreateDocumentModal } from './QuickCreateDocumentModal';
 
 type Asset = {
@@ -72,7 +72,7 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   // Stati per le modali di creazione rapida
-  const [showQuickCreateAsset, setShowQuickCreateAsset] = useState(false);
+
   const [showQuickCreateDocument, setShowQuickCreateDocument] = useState(false);
 
   async function loadAssets() {
@@ -101,12 +101,12 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
     setSelectedAsset(newAsset);
     setAssetType('existing');
     // Chiude la modale di creazione rapida
-    setShowQuickCreateAsset(false);
+
   }
 
   function handleAssetCreationCancelled() {
     // Chiude la modale di creazione rapida senza creare
-    setShowQuickCreateAsset(false);
+
     // Se non c'è nulla selezionato, disattiva lo switch
     if (!selectedAsset) {
       setHasAsset(false);
@@ -1108,22 +1108,7 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
                   Seleziona bene
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Pressable
-                    onPress={() => {
-                      setShowAssetPicker(false);
-                      setShowQuickCreateAsset(true);
-                    }}
-                    style={{ 
-                      width: 36,
-                      height: 36,
-                      backgroundColor: '#0a84ff',
-                      borderRadius: 18,
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <Ionicons name="add" size={20} color="#fff" />
-                  </Pressable>
+
                   <Pressable
                     onPress={() => {
                       setShowAssetPicker(false);
@@ -1340,11 +1325,7 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
         </Modal>
 
         {/* Modali di creazione rapida */}
-        <QuickCreateAssetModal
-          visible={showQuickCreateAsset}
-          onClose={handleAssetCreationCancelled}
-          onAssetCreated={handleAssetCreated}
-        />
+
 
         <QuickCreateDocumentModal
           visible={showQuickCreateDocument}

@@ -2,13 +2,20 @@ import * as FileSystem from 'expo-file-system';
 import { supabase } from './supabase';
 
 // ASSETS
-export type AssetInput = { name: string; type: string; identifier?: string; custom_icon?: string | null };
+export type AssetInput = { 
+  name: string; 
+  type: string; 
+  identifier?: string; 
+  custom_icon?: string | null;
+  template_key?: string;
+};
 export async function createAsset(input: AssetInput) {
   const payload = {
     name: input.name,
     type: input.type,
     identifier: input.identifier ?? null,
     custom_icon: input.custom_icon ?? null,
+    template_key: input.template_key ?? null,
   };
   const { data, error } = await supabase.from('assets').insert(payload).select('*').single();
   if (error) throw error;
@@ -19,6 +26,28 @@ export async function getAssets() {
   const { data, error } = await supabase.from('assets').select('*').order('created_at', { ascending: false });
   if (error) throw error;
   return data;
+}
+
+export async function getAssetDeadlines(assetId: string) {
+  const { data, error } = await supabase
+    .from('deadlines')
+    .select('*')
+    .eq('asset_id', assetId)
+    .order('due_at', { ascending: true });
+
+  if (error) throw error;
+  return data || [];
+}
+
+export async function getAssetDocuments(assetId: string) {
+  const { data, error } = await supabase
+    .from('documents')
+    .select('*')
+    .eq('asset_id', assetId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data || [];
 }
 
 export async function deleteAsset(id: string) {
@@ -300,12 +329,6 @@ export async function createDocumentWithAssociations(input: {
     name: string;
     type: string;
   }>;
-  newAsset?: {
-    name: string;
-    type: 'vehicles' | 'properties' | 'animals' | 'people' | 'devices' | 'subscriptions' | 'other';
-    identifier?: string;
-    custom_icon?: string | null;
-  };
   associatedDeadline?: {
     title: string;
     dueAt: string;
@@ -317,18 +340,7 @@ export async function createDocumentWithAssociations(input: {
   let assetId = input.assetId;
   let storagePath = input.storagePath;
 
-  // 1. Crea il nuovo asset se richiesto
-  if (input.newAsset) {
-    const newAsset = await createAsset({
-      name: input.newAsset.name,
-      type: input.newAsset.type,
-      identifier: input.newAsset.identifier,
-      custom_icon: input.newAsset.custom_icon ?? null
-    });
-    assetId = newAsset.id;
-  }
-
-  // 2. Carica i file se presenti (supporta sia fileInfo che filesInfo)
+  // 1. Carica i file se presenti (supporta sia fileInfo che filesInfo)
   const filesToUpload = input.filesInfo || (input.fileInfo ? [input.fileInfo] : []);
   
   if (filesToUpload.length > 0) {
@@ -405,12 +417,7 @@ export async function createDeadlineWithAssociations(input: {
   assetId?: string;
   isRecurring?: boolean;
   recurrenceRule?: string;
-  newAsset?: {
-    name: string;
-    type: 'vehicles' | 'properties' | 'animals' | 'people' | 'devices' | 'subscriptions' | 'other';
-    identifier?: string;
-    custom_icon?: string | null;
-  };
+
   associatedDocument?: {
     title: string;
     tags?: string;
@@ -418,18 +425,7 @@ export async function createDeadlineWithAssociations(input: {
 }) {
   let assetId = input.assetId;
 
-  // 1. Crea il nuovo asset se richiesto
-  if (input.newAsset) {
-    const newAsset = await createAsset({
-      name: input.newAsset.name,
-      type: input.newAsset.type,
-      identifier: input.newAsset.identifier,
-      custom_icon: input.newAsset.custom_icon ?? null
-    });
-    assetId = newAsset.id;
-  }
-
-  // 2. Crea la scadenza
+  // 1. Crea la scadenza
   const deadline = await createDeadline({
     title: input.title,
     dueAt: input.dueAt,

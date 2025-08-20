@@ -1,83 +1,33 @@
-import { AddAssetModal } from '@/components/modals/AddAssetModal';
-import { AssetDetailModal } from '@/components/modals/AssetDetailModal';
+
 import { DeadlineDetailModal } from '@/components/modals/DeadlineDetailModal';
 import { DocumentDetailModal } from '@/components/modals/DocumentDetailModal';
-import { EditAssetModal } from '@/components/modals/EditAssetModal';
+
+import { NewAddAssetModal } from '@/components/modals/NewAddAssetModal';
 import { Colors } from '@/constants/Colors';
 import { deleteAsset, deleteDeadline, getAllDeadlines, getAssets, updateDeadlineStatus } from '@/lib/api';
+import { getAssetIcon } from '@/lib/assetIcons';
 import { Asset, Deadline, Document } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 
 export default function BeniScreen() {
+  const router = useRouter();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
-  const [showAssetDetail, setShowAssetDetail] = useState(false);
+
   const [selectedDeadline, setSelectedDeadline] = useState<Deadline | null>(null);
   const [showDeadlineDetail, setShowDeadlineDetail] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [showDocumentDetail, setShowDocumentDetail] = useState(false);
-  const [showEditAsset, setShowEditAsset] = useState(false);
+
   const [search, setSearch] = useState('');
 
-  const typeIcons = {
-    // Nuove categorie
-    vehicles: 'car',
-    properties: 'home',
-    animals: 'paw',
-    people: 'person',
-    devices: 'phone-portrait',
-    subscriptions: 'card',
-    other: 'cube',
-    // Retrocompatibilità con vecchie categorie
-    car: 'car',
-    house: 'home'
-  } as const;
 
-  // Helper per ottenere l'icona da mostrare
-  function getAssetIcon(asset: Asset): string {
-    // Se ha un'icona personalizzata, usala con fallback
-    if (asset?.custom_icon && typeof asset.custom_icon === 'string') {
-      // Lista di icone valide per fallback
-      const validIcons = [
-        'car', 'home', 'paw', 'person', 'phone-portrait', 'card', 'cube', 
-        'boat', 'bicycle', 'airplane', 'train', 'bus', 'medical', 'business',
-        'restaurant', 'school', 'fitness', 'camera', 'laptop', 'watch'
-      ];
-      
-      // Se l'icona personalizzata è valida, usala, altrimenti fallback
-      if (validIcons.includes(asset.custom_icon)) {
-        return asset.custom_icon;
-      } else {
-        // Fallback per icone non valide
-        const fallbackMap: Record<string, string> = {
-          'hospital': 'medical',
-          'building': 'business', 
-          'factory': 'business',
-          'office': 'business',
-          'bank': 'business',
-          'store': 'business'
-        };
-        const fallbackIcon = fallbackMap[asset.custom_icon];
-        if (fallbackIcon && validIcons.includes(fallbackIcon)) {
-          return fallbackIcon;
-        }
-      }
-    }
-    
-    // Fallback all'icona predefinita per il tipo
-    if (asset?.type && typeIcons[asset.type as keyof typeof typeIcons]) {
-      return typeIcons[asset.type as keyof typeof typeIcons];
-    }
-    
-    // Ultimo fallback
-    return typeIcons.other;
-  }
 
   function getAssetDeadlineStatus(assetId: string, deadlines: Deadline[]) {
     const assetDeadlines = deadlines.filter(d => 
@@ -132,41 +82,69 @@ export default function BeniScreen() {
     try {
       await deleteAsset(assetId);
       await load();
-      setShowAssetDetail(false);
-      setSelectedAsset(null);
     } catch (e: any) {
       Alert.alert('Errore', e.message);
     }
   }
+
+  // Funzione per normalizzare i tipi di asset
+  const normalizeAssetType = (type: string): string => {
+    const typeMapping: Record<string, string> = {
+      // Singolari (migrazione 013)
+      'vehicle': 'vehicle',
+      'home': 'home', 
+      'device': 'device',
+      'appliance': 'appliance',
+      'animal': 'animal',
+      'person': 'person',
+      'subscription': 'subscription',
+      'property': 'property',
+      'investment': 'investment',
+      'other': 'other',
+      
+      // Plurali (migrazione 010) - normalizza ai singolari
+      'vehicles': 'vehicle',
+      'properties': 'property',
+      'animals': 'animal',
+      'people': 'person',
+      'devices': 'device',
+      'subscriptions': 'subscription',
+      
+      // Legacy (migrazioni precedenti)
+      'car': 'vehicle',
+      'house': 'home'
+    };
+    
+    return typeMapping[type] || 'other';
+  };
 
   const filteredAssets = assets.filter(asset =>
     asset.name.toLowerCase().includes(search.toLowerCase()) ||
     (asset.identifier && asset.identifier.toLowerCase().includes(search.toLowerCase()))
   );
 
-  // Raggruppa i beni per categoria
+  // Raggruppa i beni per categoria normalizzata
   const groupedAssets = filteredAssets.reduce((groups, asset) => {
-    const category = asset.type;
-    if (!groups[category]) {
-      groups[category] = [];
+    const normalizedCategory = normalizeAssetType(asset.type);
+    if (!groups[normalizedCategory]) {
+      groups[normalizedCategory] = [];
     }
-    groups[category].push(asset);
+    groups[normalizedCategory].push(asset);
     return groups;
   }, {} as Record<string, Asset[]>);
 
-  // Mapping per le etichette delle categorie (con retrocompatibilità)
-  const categoryLabels = {
-    // Nuove categorie
-    vehicles: 'Veicoli',
-    properties: 'Immobili',
-    animals: 'Animali',
-    people: 'Persone',
-    devices: 'Dispositivi',
-    subscriptions: 'Abbonamenti',
-    other: 'Altro',
-    // Retrocompatibilità con vecchie categorie
-    car: 'Veicoli',
-    house: 'Immobili'
+  // Mapping per le etichette delle categorie normalizzate
+  const categoryLabels: Record<string, string> = {
+    'vehicle': 'Veicoli',
+    'home': 'Casa',
+    'device': 'Dispositivi',
+    'appliance': 'Elettrodomestici', 
+    'animal': 'Animali',
+    'person': 'Persone',
+    'subscription': 'Abbonamenti',
+    'property': 'Proprietà',
+    'investment': 'Investimenti',
+    'other': 'Altro'
   };
 
   // Componente per le sezioni dei beni
@@ -201,8 +179,10 @@ export default function BeniScreen() {
               <Pressable
                 key={asset.id}
                 onPress={() => {
-                  setSelectedAsset(asset);
-                  setShowAssetDetail(true);
+                  router.push({
+                    pathname: '/asset-detail',
+                    params: { id: asset.id }
+                  });
                 }}
                 style={{
                   flexDirection: 'row',
@@ -393,45 +373,15 @@ export default function BeniScreen() {
         </ScrollView>
       </View>
 
-      <AddAssetModal
+      <NewAddAssetModal
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
-        onSubmit={handleCreateAsset}
+        onSubmit={async (asset) => {
+          await load();
+        }}
       />
 
-      {selectedAsset && (
-        <AssetDetailModal
-          visible={showAssetDetail}
-          asset={selectedAsset}
-          onClose={() => {
-            setShowAssetDetail(false);
-            setSelectedAsset(null);
-          }}
-          onDelete={() => handleDeleteAsset(selectedAsset.id)}
-          onEdit={async () => {
-            setShowAssetDetail(false);
-            setTimeout(() => {
-              setShowEditAsset(true);
-            }, 100);
-          }}
-          onDeadlinePress={(deadline) => {
-            // Chiudi prima il modal del bene, poi apri quello della scadenza
-            setShowAssetDetail(false);
-            setTimeout(() => {
-              setSelectedDeadline(deadline);
-              setShowDeadlineDetail(true);
-            }, 100);
-          }}
-          onDocumentPress={(document) => {
-            // Chiudi prima il modal del bene, poi apri quello del documento
-            setShowAssetDetail(false);
-            setTimeout(() => {
-              setSelectedDocument(document);
-              setShowDocumentDetail(true);
-            }, 100);
-          }}
-        />
-      )}
+
 
       {selectedDeadline && (
         <DeadlineDetailModal
@@ -472,17 +422,15 @@ export default function BeniScreen() {
             setSelectedDeadline(null);
           }}
           onAssetPress={(asset) => {
-            // Trova l'asset completo dai dati locali
-            const fullAsset = assets.find(a => a.id === asset.id);
-            if (fullAsset) {
-              // Chiudi prima il modal della scadenza, poi apri quello del bene
-              setShowDeadlineDetail(false);
-              setSelectedDeadline(null);
-              setTimeout(() => {
-                setSelectedAsset(fullAsset);
-                setShowAssetDetail(true);
-              }, 100);
-            }
+            // Chiudi il modal della scadenza e naviga al dettaglio bene
+            setShowDeadlineDetail(false);
+            setSelectedDeadline(null);
+            setTimeout(() => {
+              router.push({
+                pathname: '/asset-detail',
+                params: { id: asset.id }
+              });
+            }, 100);
           }}
         />
       )}
@@ -495,17 +443,19 @@ export default function BeniScreen() {
             setShowDocumentDetail(false);
             setSelectedDocument(null);
           }}
+          onUpdate={async () => {
+            // Non serve ricaricare nulla qui, il documento non è nella lista principale
+          }}
           onAssetPress={(asset) => {
-            const fullAsset = assets.find(a => a.id === asset.id);
-            if (fullAsset) {
-              // Chiudi prima il modal del documento, poi apri quello del bene
-              setShowDocumentDetail(false);
-              setSelectedDocument(null);
-              setTimeout(() => {
-                setSelectedAsset(fullAsset);
-                setShowAssetDetail(true);
-              }, 100);
-            }
+            // Chiudi il modal del documento e naviga al dettaglio bene
+            setShowDocumentDetail(false);
+            setSelectedDocument(null);
+            setTimeout(() => {
+              router.push({
+                pathname: '/asset-detail',
+                params: { id: asset.id }
+              });
+            }, 100);
           }}
           onDeadlinePress={(deadline) => {
             // Chiudi prima il modal del documento, poi apri quello della scadenza
@@ -519,18 +469,7 @@ export default function BeniScreen() {
         />
       )}
 
-      <EditAssetModal
-        visible={showEditAsset}
-        asset={selectedAsset}
-        onClose={() => {
-          setShowEditAsset(false);
-        }}
-        onUpdate={async () => {
-          await load();
-          setShowEditAsset(false);
-          setSelectedAsset(null);
-        }}
-      />
+
     </SafeAreaView>
   );
 } 
