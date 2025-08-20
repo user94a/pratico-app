@@ -1,0 +1,36 @@
+{
+  "cli": {
+    "version": ">= 3.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "resourceClass": "m1-medium"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "resourceClass": "m1-medium",
+        "simulator": true
+      }
+    },
+    "production": {
+      "distribution": "store",
+      "ios": {
+        "resourceClass": "m1-medium"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "calamandrei@extendi.it",
+        "appleTeamId": "42VDF35D65"
+      }
+    }
+  }
+} 
