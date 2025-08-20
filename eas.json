@@ -29,8 +29,9 @@
     "production": {
       "ios": {
         "appleId": "calamandrei@extendi.it",
-        "appleTeamId": "42VDF35D65"
+        "appleTeamId": "42VDF35D65",
+        "ascAppId": "6751237238"
       }
     }
   }
-} 
+}
