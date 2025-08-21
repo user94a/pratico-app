@@ -5,6 +5,7 @@ import 'react-native-url-polyfill/auto';
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
+import Constants from 'expo-constants';
 
 // 2) Shim per location: serve perché alcune librerie (come supabase-js)
 //    si aspettano un oggetto location anche in ambiente React Native
@@ -13,8 +14,22 @@ if (typeof (global as any).location === 'undefined') {
 }
 
 // 3) Variabili d'ambiente (Expo usa il prefisso EXPO_PUBLIC_ per esporle al client)
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
+//    In produzione (TestFlight) assicuriamoci di avere un fallback da app.config extra
+const envUrl = process.env.EXPO_PUBLIC_SUPABASE_URL as string | undefined;
+const envAnon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string | undefined;
+
+const extra = (Constants?.expoConfig?.extra ?? {}) as any;
+const extraUrl = extra?.supabaseUrl as string | undefined;
+const extraAnon = extra?.supabaseAnonKey as string | undefined;
+
+const supabaseUrl = envUrl || extraUrl;
+const supabaseAnonKey = envAnon || extraAnon;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  // Log esplicito per capire subito in produzione
+  console.error('Supabase env missing. Check EXPO_PUBLIC_SUPABASE_URL/ANON_KEY or extra in app.config');
+  throw new Error('supabaseUrl is required');
+}
 
 // 4) Creazione client Supabase
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
