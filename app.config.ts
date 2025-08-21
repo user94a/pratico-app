@@ -19,7 +19,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'it.extendi.pratico',
-    buildNumber: '7',
+    buildNumber: '10',
     userInterfaceStyle: 'light',
     infoPlist: {
       NSCameraUsageDescription: 'Questa app usa la fotocamera per scattare foto dei documenti da allegare.',

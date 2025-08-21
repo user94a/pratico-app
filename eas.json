@@ -23,6 +23,12 @@
       "ios": {
         "resourceClass": "m-medium"
       }
+    },
+    "internal": {
+      "distribution": "internal",
+      "ios": {
+        "resourceClass": "m-medium"
+      }
     }
   },
   "submit": {
