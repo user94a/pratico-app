@@ -15,12 +15,14 @@ if (typeof (global as any).location === 'undefined') {
 
 // 3) Variabili d'ambiente (Expo usa il prefisso EXPO_PUBLIC_ per esporle al client)
 //    In produzione (TestFlight) assicuriamoci di avere un fallback da app.config extra
-const envUrl = process.env.EXPO_PUBLIC_SUPABASE_URL as string | undefined;
-const envAnon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string | undefined;
+const sanitize = (v?: string) => (v && !v.startsWith('@') ? v : undefined);
+
+const envUrl = sanitize(process.env.EXPO_PUBLIC_SUPABASE_URL as string | undefined);
+const envAnon = sanitize(process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY as string | undefined);
 
 const extra = (Constants?.expoConfig?.extra ?? {}) as any;
-const extraUrl = extra?.supabaseUrl as string | undefined;
-const extraAnon = extra?.supabaseAnonKey as string | undefined;
+const extraUrl = sanitize(extra?.supabaseUrl as string | undefined);
+const extraAnon = sanitize(extra?.supabaseAnonKey as string | undefined);
 
 const supabaseUrl = envUrl || extraUrl;
 const supabaseAnonKey = envAnon || extraAnon;
