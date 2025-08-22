@@ -10,7 +10,6 @@ import React, { useCallback, useState } from 'react';
 import { ActionSheetIOS, Alert, FlatList, Image, Modal, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-
 export interface AddDocumentModalRef {
   resetLoading: () => void;
 }
@@ -33,7 +32,6 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
       name: string;
       type: string;
     }>;
-
     associatedDeadline?: {
       title: string;
       dueAt: string;
@@ -51,15 +49,10 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   
   // Stati per la gestione beni
-  const [hasAsset, setHasAsset] = useState(false);
-  const [assetType, setAssetType] = useState<'existing' | 'new'>('new');
-  const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+  const [selectedAssets, setSelectedAssets] = useState<Asset[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetSearch, setAssetSearch] = useState('');
   const [showAssetPicker, setShowAssetPicker] = useState(false);
-  const [newAssetName, setNewAssetName] = useState('');
-  const [newAssetType, setNewAssetType] = useState<'vehicles' | 'properties' | 'animals' | 'people' | 'devices' | 'subscriptions' | 'other'>('vehicles');
-  const [newAssetIdentifier, setNewAssetIdentifier] = useState('');
   
   // Stati per la scadenza associata
   const [createDeadline, setCreateDeadline] = useState(false);
@@ -69,9 +62,6 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
   const [isRecurring, setIsRecurring] = useState(false);
   const [selectedRecurrence, setSelectedRecurrence] = useState<keyof typeof RECURRENCE_TEMPLATES>('monthly');
   const [showDatePicker, setShowDatePicker] = useState(false);
-
-  // Stati per le modali di creazione rapida
-
 
   // Stati per il loading
   const [isCreating, setIsCreating] = useState(false);
@@ -99,31 +89,13 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
     resetLoading: () => setIsCreating(false)
   }));
 
-  const filteredAssets = assets.filter(a =>
-    a.name.toLowerCase().includes(assetSearch.toLowerCase()) ||
-    (a.identifier && a.identifier.toLowerCase().includes(assetSearch.toLowerCase()))
+  // Filtra beni in base alla ricerca
+  const filteredAssets = assets.filter(asset => 
+    asset.name.toLowerCase().includes(assetSearch.toLowerCase()) ||
+    (asset.identifier && asset.identifier.toLowerCase().includes(assetSearch.toLowerCase()))
   );
 
-  // Funzione per la creazione rapida degli asset
-  function handleAssetCreated(newAsset: Asset) {
-    // Aggiorna la lista degli asset
-    setAssets(prev => [...prev, newAsset]);
-    // Seleziona automaticamente l'asset appena creato
-    setSelectedAsset(newAsset);
-    setAssetType('existing');
-    // Chiude la modale di creazione rapida
-
-  }
-
-  function handleAssetCreationCancelled() {
-    // Chiude la modale di creazione rapida senza creare
-
-    // Se non c'è un asset selezionato, disattiva lo switch
-    if (!selectedAsset) {
-      setHasAsset(false);
-    }
-  }
-
+  // Funzioni per gestione file
   function handleFileSelection() {
     if (Platform.OS === 'ios') {
       ActionSheetIOS.showActionSheetWithOptions(
@@ -133,45 +105,11 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
         },
         async (buttonIndex) => {
           if (buttonIndex === 1) {
-            // Scatta una foto singola
             await takeSinglePhoto();
           } else if (buttonIndex === 2) {
-            // Galleria - supporto foto multiple
-            const result = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ImagePicker.MediaTypeOptions.Images,
-              allowsEditing: false, // Rimuove il crop forzato
-              quality: 0.8,
-              allowsMultipleSelection: true, // Abilita selezione multipla
-            });
-            if (!result.canceled && result.assets.length > 0) {
-              const newFiles = result.assets.map(asset => ({
-                uri: asset.uri,
-                name: asset.fileName || 'image.jpg',
-                type: asset.type || 'image/jpeg'
-              }));
-              const newUrls = result.assets.map(asset => asset.uri);
-              setSelectedFiles(prev => [...prev, ...newFiles]);
-              setPreviewUrls(prev => [...prev, ...newUrls]);
-            }
+            await selectFromGallery();
           } else if (buttonIndex === 3) {
-            // Documenti - supporto file multipli
-            const result = await DocumentPicker.getDocumentAsync({
-              type: ['application/pdf', 'image/*'],
-              copyToCacheDirectory: true,
-              multiple: true, // Abilita selezione multipla
-            });
-            if (!result.canceled && result.assets.length > 0) {
-              const newFiles = result.assets.map(asset => ({
-                uri: asset.uri,
-                name: asset.name,
-                type: asset.mimeType || 'application/pdf'
-              }));
-              const newUrls = result.assets
-                .filter(asset => asset.mimeType?.startsWith('image/'))
-                .map(asset => asset.uri);
-              setSelectedFiles(prev => [...prev, ...newFiles]);
-              setPreviewUrls(prev => [...prev, ...newUrls]);
-            }
+            await selectDocuments();
           }
         }
       );
@@ -182,60 +120,15 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
         'Scegli da dove aggiungere i file',
         [
           { text: 'Annulla', style: 'cancel' },
-          { 
-            text: 'Scatta foto', 
-            onPress: () => takeSinglePhoto()
-          },
-          { 
-            text: 'Galleria', 
-            onPress: async () => {
-              const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: false,
-                quality: 0.8,
-                allowsMultipleSelection: true,
-              });
-              if (!result.canceled && result.assets.length > 0) {
-                const newFiles = result.assets.map(asset => ({
-                  uri: asset.uri,
-                  name: asset.fileName || 'image.jpg',
-                  type: asset.type || 'image/jpeg'
-                }));
-                const newUrls = result.assets.map(asset => asset.uri);
-                setSelectedFiles(prev => [...prev, ...newFiles]);
-                setPreviewUrls(prev => [...prev, ...newUrls]);
-              }
-            }
-          },
-          { 
-            text: 'Documenti', 
-            onPress: async () => {
-              const result = await DocumentPicker.getDocumentAsync({
-                type: ['application/pdf', 'image/*'],
-                copyToCacheDirectory: true,
-                multiple: true,
-              });
-              if (!result.canceled && result.assets.length > 0) {
-                const newFiles = result.assets.map(asset => ({
-                  uri: asset.uri,
-                  name: asset.name,
-                  type: asset.mimeType || 'application/pdf'
-                }));
-                const newUrls = result.assets
-                  .filter(asset => asset.mimeType?.startsWith('image/'))
-                  .map(asset => asset.uri);
-                setSelectedFiles(prev => [...prev, ...newFiles]);
-                setPreviewUrls(prev => [...prev, ...newUrls]);
-              }
-            }
-          }
+          { text: 'Scatta foto', onPress: () => takeSinglePhoto() },
+          { text: 'Galleria', onPress: () => selectFromGallery() },
+          { text: 'Documenti', onPress: () => selectDocuments() }
         ]
       );
     }
   }
 
   async function takeSinglePhoto() {
-    // Richiedi permessi camera
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permesso richiesto', 'È necessario il permesso della fotocamera per scattare foto.');
@@ -244,7 +137,7 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
     
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: false, // Rimuove il crop forzato
+      allowsEditing: false,
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
@@ -259,19 +152,65 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
     }
   }
 
+  async function selectFromGallery() {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: false,
+      quality: 0.8,
+      allowsMultipleSelection: true,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      const newFiles = result.assets.map(asset => ({
+        uri: asset.uri,
+        name: asset.fileName || 'image.jpg',
+        type: asset.type || 'image/jpeg'
+      }));
+      const newUrls = result.assets.map(asset => asset.uri);
+      setSelectedFiles(prev => [...prev, ...newFiles]);
+      setPreviewUrls(prev => [...prev, ...newUrls]);
+    }
+  }
+
+  async function selectDocuments() {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: ['application/pdf', 'image/*'],
+      copyToCacheDirectory: true,
+      multiple: true,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      const newFiles = result.assets.map(asset => ({
+        uri: asset.uri,
+        name: asset.name,
+        type: asset.mimeType || 'application/pdf'
+      }));
+      const newUrls = result.assets
+        .filter(asset => asset.mimeType?.startsWith('image/'))
+        .map(asset => asset.uri);
+      setSelectedFiles(prev => [...prev, ...newFiles]);
+      setPreviewUrls(prev => [...prev, ...newUrls]);
+    }
+  }
+
+  // Funzioni per gestione associazioni
+  function handleAssetSelection(asset: Asset) {
+    if (!selectedAssets.find(a => a.id === asset.id)) {
+      setSelectedAssets(prev => [...prev, asset]);
+    }
+    setShowAssetPicker(false);
+  }
+
+  function removeAsset(assetId: string) {
+    setSelectedAssets(prev => prev.filter(asset => asset.id !== assetId));
+  }
+
   function reset() {
     setTitle('');
     setTags('');
     setSelectedFiles([]);
     setPreviewUrls([]);
-    setHasAsset(false);
-    setAssetType('new');
-    setSelectedAsset(null);
+    setSelectedAssets([]);
     setAssetSearch('');
     setShowAssetPicker(false);
-    setNewAssetName('');
-    setNewAssetType('vehicles');
-    setNewAssetIdentifier('');
     setCreateDeadline(false);
     setDeadlineTitle('');
     setDeadlineDate(new Date());
@@ -285,10 +224,6 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
   function handleSave() {
     if (!title.trim()) return Alert.alert('Errore', 'Il titolo è richiesto');
 
-    if (hasAsset && assetType === 'new' && !newAssetName.trim()) {
-      return Alert.alert('Errore', 'Il nome del nuovo bene è richiesto');
-    }
-
     if (createDeadline && !deadlineTitle.trim()) {
       return Alert.alert('Errore', 'Il titolo della scadenza è richiesto');
     }
@@ -298,187 +233,240 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
 
     const associatedDeadline = createDeadline ? {
       title: deadlineTitle.trim(),
-      dueAt: deadlineDate.toISOString().split('T')[0],
+      dueAt: deadlineDate.toISOString(),
       notes: deadlineNotes.trim() || undefined,
       isRecurring,
       recurrenceRule: isRecurring ? RECURRENCE_TEMPLATES[selectedRecurrence].rule : undefined
     } : undefined;
 
-    let newAsset;
-    if (hasAsset && assetType === 'new') {
-      newAsset = {
-        name: newAssetName.trim(),
-        type: newAssetType,
-        identifier: newAssetIdentifier.trim() || undefined
-      };
-    }
-
-    // Chiama onSubmit che gestirà la creazione asincrona
-    onSubmit({
+    const result = {
       title: title.trim(),
       tags: tags.trim() || undefined,
-      assetId: hasAsset && assetType === 'existing' ? selectedAsset?.id : undefined,
-      storagePath: undefined,
-      filesInfo: selectedFiles.length > 0 ? selectedFiles : undefined,
+      assetIds: selectedAssets.map(asset => asset.id),
+      storagePath: undefined, // Gestito dal backend
+      fileInfo: selectedFiles.length === 1 ? selectedFiles[0] : undefined,
+      filesInfo: selectedFiles.length > 1 ? selectedFiles : undefined,
       associatedDeadline
-    });
+    };
+
+    onSubmit(result);
+  }
+
+  function handleClose() {
+    reset();
+    onClose();
   }
 
   function handleDateChange(event: any, selectedDate?: Date) {
-    setShowDatePicker(Platform.OS === 'ios');
+    setShowDatePicker(false);
     if (selectedDate) {
       setDeadlineDate(selectedDate);
     }
   }
 
+  const recurrenceKeys = Object.keys(RECURRENCE_TEMPLATES) as (keyof typeof RECURRENCE_TEMPLATES)[];
+
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
-      <View style={{ flex: 1, padding: 16 }}>
-            <Text style={{ fontSize: 28, fontWeight: '800', marginBottom: 24 }}>Aggiungi documento</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.light.background }}>
+        {/* Header */}
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderBottomWidth: 0.33,
+          borderBottomColor: Colors.light.border,
+          backgroundColor: Colors.light.cardBackground
+        }}>
+          <Pressable onPress={handleClose}>
+            <Text style={{ 
+              fontSize: 16, 
+              color: Colors.light.textSecondary, 
+              fontWeight: '600' 
+            }}>
+              Annulla
+            </Text>
+          </Pressable>
+          
+          <Text style={{
+            fontSize: 17,
+            fontWeight: '600',
+            color: Colors.light.text
+          }}>
+            Aggiungi Documento
+          </Text>
 
-            <View style={{ gap: 16, flex: 1 }}>
-              <View>
-                <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8, color: '#333' }}>
-                  Titolo documento
-                </Text>
-          <TextInput
-            value={title}
-            onChangeText={setTitle}
-                  style={{ 
-                    backgroundColor: '#f2f2f7',
-                    borderRadius: 12, 
-                    padding: 16,
-                    fontSize: 16,
-                    borderWidth: 0
-                  }}
-                />
-              </View>
+          <Pressable
+            onPress={handleSave}
+            disabled={!title.trim()}
+            style={{ opacity: title.trim() ? 1 : 0.5 }}
+          >
+            <Text style={{ 
+              fontSize: 16, 
+              color: Colors.light.tint, 
+              fontWeight: '600' 
+            }}>
+              Aggiungi
+            </Text>
+          </Pressable>
+        </View>
 
-              <View>
-                <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8, color: '#333' }}>
-                  Tag
-                </Text>
-                <Text style={{ fontSize: 14, color: '#666', marginBottom: 8 }}>
-                  Aggiungi tag separati da virgola (opzionale)
-                </Text>
-          <TextInput
-            value={tags}
-            onChangeText={setTags}
-                  style={{ 
-                    backgroundColor: '#f2f2f7',
-                    borderRadius: 12, 
-                    padding: 16,
-                    fontSize: 16,
-                    borderWidth: 0
-                  }}
-                />
-              </View>
+        <ScrollView 
+          style={{ flex: 1 }} 
+          contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={{ gap: 12 }}>
+            {/* Titolo */}
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ 
+                fontSize: 16, 
+                fontWeight: '600', 
+                color: Colors.light.text,
+                marginBottom: 12,
+                marginLeft: 4
+              }}>
+                Titolo *
+              </Text>
+              <TextInput
+                value={title}
+                onChangeText={setTitle}
+                style={{ 
+                  backgroundColor: Colors.light.cardBackground,
+                  borderRadius: 16,
+                  padding: 16,
+                  fontSize: 16,
+                  color: Colors.light.text,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 1,
+                  elevation: 1
+                }}
+              />
+            </View>
 
-              {/* Sezione upload file */}
-              <View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <Text style={{ fontSize: 14, color: '#666', fontWeight: '600' }}>
-                    File (opzionale):
-                  </Text>
-                  {selectedFiles.length > 0 && (
-                    <Text style={{ fontSize: 12, color: '#0a84ff', fontWeight: '600' }}>
-                      {selectedFiles.length} file{selectedFiles.length > 1 ? '' : ''} selezionat{selectedFiles.length > 1 ? 'i' : 'o'}
-                    </Text>
-                  )}
-                </View>
-                
-                {/* Griglia orizzontale per le preview */}
+            {/* Tag */}
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ 
+                fontSize: 16, 
+                fontWeight: '600', 
+                color: Colors.light.text,
+                marginBottom: 12,
+                marginLeft: 4
+              }}>
+                Tag
+              </Text>
+              <TextInput
+                value={tags}
+                onChangeText={setTags}
+                style={{ 
+                  backgroundColor: Colors.light.cardBackground,
+                  borderRadius: 16,
+                  padding: 16,
+                  fontSize: 16,
+                  color: Colors.light.text,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 1,
+                  elevation: 1
+                }}
+              />
+            </View>
+
+            {/* File Upload */}
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ 
+                fontSize: 16, 
+                fontWeight: '600', 
+                color: Colors.light.text,
+                marginBottom: 12,
+                marginLeft: 4
+              }}>
+                File
+              </Text>
+              <Pressable
+                onPress={handleFileSelection}
+                style={{ 
+                  backgroundColor: Colors.light.cardBackground,
+                  borderRadius: 16,
+                  padding: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 1,
+                  elevation: 1
+                }}
+              >
+                <Text style={{ 
+                  fontSize: 16,
+                  color: Colors.light.text
+                }}>
+                  {selectedFiles.length > 0 ? `${selectedFiles.length} file selezionati` : 'Aggiungi file'}
+                </Text>
+                <Ionicons name="add" size={20} color={Colors.light.tint} />
+              </Pressable>
+
+              {/* Preview dei file selezionati */}
+              {selectedFiles.length > 0 && (
                 <View style={{ 
                   flexDirection: 'row', 
                   flexWrap: 'wrap', 
-                  gap: 12, 
-                  marginBottom: selectedFiles.length > 0 ? 12 : 0 
+                  gap: 8, 
+                  marginTop: 12 
                 }}>
-                  {selectedFiles.map((file, index) => {
-                    // Debug: log file info
-                    console.log(`File ${index}:`, { 
-                      name: file.name, 
-                      type: file.type, 
-                      hasPreview: !!previewUrls[index],
-                      previewUrl: previewUrls[index] 
-                    });
-                    
-                    return (
-                      <View key={index} style={{
-                        width: 100,
-                        height: 100,
-                        borderRadius: 12,
-                        backgroundColor: '#f2f2f7',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        borderWidth: 2,
-                        borderColor: '#0a84ff'
-                      }}>
-                        {/* Preview del file */}
-                        {((file.type && file.type.startsWith('image/')) || 
-                          file.name.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/)) && 
-                          previewUrls[index] ? (
-                          <Image 
-                            source={{ uri: previewUrls[index] }} 
-                            style={{ 
-                              width: '100%', 
-                              height: '100%',
-                            }}
-                            resizeMode="cover"
-                            onError={(error) => {
-                              console.log('Image load error for file:', file.name, error);
-                            }}
-                            onLoad={() => {
-                              console.log('Image loaded successfully:', file.name, previewUrls[index]);
-                            }}
-                          />
-                        ) : file.type === 'application/pdf' ? (
-                          <View style={{
-                            width: '100%',
+                  {selectedFiles.map((file, index) => (
+                    <View key={index} style={{
+                      width: 80,
+                      height: 80,
+                      borderRadius: 8,
+                      backgroundColor: Colors.light.background,
+                      position: 'relative',
+                      overflow: 'hidden',
+                      borderWidth: 1,
+                      borderColor: Colors.light.border
+                    }}>
+                      {/* Preview del file */}
+                      {((file.type && file.type.startsWith('image/')) || 
+                        file.name.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/)) && 
+                        previewUrls[index] ? (
+                        <Image 
+                          source={{ uri: previewUrls[index] }} 
+                          style={{ 
+                            width: '100%', 
                             height: '100%',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            backgroundColor: '#f2f2f7'
-                          }}>
-                            <Ionicons name="document-text" size={32} color="#666" />
-                            <Text style={{ fontSize: 8, color: '#666', marginTop: 2 }}>PDF</Text>
-                          </View>
-                        ) : (
-                          // Fallback: mostra sempre la preview se abbiamo un URL, anche se il tipo non è riconosciuto
-                          previewUrls[index] ? (
-                            <Image 
-                              source={{ uri: previewUrls[index] }} 
-                              style={{ 
-                                width: '100%', 
-                                height: '100%',
-                              }}
-                              resizeMode="cover"
-                              onError={(error) => {
-                                console.log('Fallback image load error for file:', file.name, error);
-                              }}
-                              onLoad={() => {
-                                console.log('Fallback image loaded successfully:', file.name);
-                              }}
-                            />
-                          ) : (
-                            <View style={{
-                              width: '100%',
-                              height: '100%',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              backgroundColor: '#f2f2f7'
-                            }}>
-                              <Ionicons name="document" size={32} color="#666" />
-                              <Text style={{ fontSize: 8, color: '#666', marginTop: 2 }}>
-                                {file.type || 'FILE'}
-                              </Text>
-                            </View>
-                          )
-                        )}
+                          }}
+                          resizeMode="cover"
+                        />
+                      ) : file.type === 'application/pdf' ? (
+                        <View style={{
+                          width: '100%',
+                          height: '100%',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: Colors.light.background
+                        }}>
+                          <Ionicons name="document-text" size={24} color={Colors.light.textSecondary} />
+                        </View>
+                      ) : (
+                        <View style={{
+                          width: '100%',
+                          height: '100%',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: Colors.light.background
+                        }}>
+                          <Ionicons name="document" size={24} color={Colors.light.textSecondary} />
+                        </View>
+                      )}
                       
-                      {/* Pulsante elimina in alto a destra */}
+                      {/* Pulsante elimina */}
                       <Pressable 
                         onPress={() => {
                           setSelectedFiles(prev => prev.filter((_, i) => i !== index));
@@ -488,562 +476,498 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
                           position: 'absolute',
                           top: 4,
                           right: 4,
-                          width: 24,
-                          height: 24,
-                          borderRadius: 12,
+                          width: 20,
+                          height: 20,
+                          borderRadius: 10,
                           backgroundColor: 'rgba(255, 59, 48, 0.9)',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          shadowColor: '#000',
-                          shadowOffset: { width: 0, height: 1 },
-                          shadowOpacity: 0.2,
-                          shadowRadius: 1,
                         }}
                       >
-                        <Ionicons name="close" size={14} color="#fff" />
-            </Pressable>
-                      
-                      {/* Nome file in basso (opzionale, solo per debug) */}
-                      {false && (
-                        <View style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          left: 0,
-                          right: 0,
-                          backgroundColor: 'rgba(0,0,0,0.7)',
-                          padding: 2
-                        }}>
-                          <Text style={{ 
-                            fontSize: 8, 
-                            color: '#fff', 
-                            textAlign: 'center'
-                          }} numberOfLines={1}>
-                            {file.name}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  );
-                })}
-                  
-                  {/* Pulsante + per aggiungere file - sempre visibile */}
-                  <Pressable
-                    onPress={handleFileSelection}
-                    style={{
-                      width: 100,
-                      height: 100,
-                      borderRadius: 12,
-                      borderWidth: 2,
-                      borderColor: '#0a84ff',
-                      borderStyle: 'dashed',
-                      backgroundColor: 'rgba(10, 132, 255, 0.05)',
-                      alignItems: 'center',
-                      justifyContent: 'center'
-                    }}
-                  >
-                    <Ionicons name="add" size={32} color="#0a84ff" />
-                    <Text style={{ 
-                      fontSize: 10, 
-                      color: '#0a84ff', 
-                      fontWeight: '600',
-                      marginTop: 4,
-                      textAlign: 'center'
-                    }}>
-                      Aggiungi{'\n'}file
-                    </Text>
-            </Pressable>
-                </View>
-          </View>
-
-              <View style={{
-                borderWidth: 1,
-                borderColor: '#d1d1d6',
-                borderRadius: 12,
-                padding: 16,
-                backgroundColor: '#fff'
-              }}>
-                <View style={{ 
-                  flexDirection: 'row', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  marginBottom: hasAsset ? 16 : 0
-                }}>
-                  <Text style={{ fontSize: 16, fontWeight: '600' }}>
-                    Bene associato
-                  </Text>
-                  <Switch
-                    value={hasAsset}
-                    onValueChange={(value) => {
-                      setHasAsset(value);
-                      if (value) {
-                        // Apri automaticamente il picker quando si attiva lo switch
-                        setAssetType('existing');
-                        setShowAssetPicker(true);
-                      }
-                    }}
-                    trackColor={{ false: '#e5e5ea', true: '#34c759' }}
-                    thumbColor="#fff"
-                  />
-                </View>
-
-                {hasAsset && (
-                  <View style={{ gap: 16 }}>
-                    {selectedAsset ? (
-                      // Mostra solo l'asset selezionato
-                      <View>
-                        <Text style={{ fontSize: 14, marginBottom: 8, color: '#666', fontWeight: '600' }}>
-                          Bene collegato:
-                        </Text>
-                        <View style={{
-                          borderWidth: 1,
-                          borderColor: '#0a84ff',
-                          borderRadius: 8,
-                          padding: 12,
-                          backgroundColor: '#e8f4ff',
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between'
-                        }}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontWeight: '600' }}>{selectedAsset.name}</Text>
-                            {selectedAsset.identifier && (
-                              <Text style={{ fontSize: 12, color: '#666' }}>
-                                {selectedAsset.identifier}
-                              </Text>
-                            )}
-                          </View>
-                          <Pressable onPress={() => {
-                            setSelectedAsset(null);
-                            setShowAssetPicker(true);
-                          }} style={{ padding: 4 }}>
-                            <Ionicons name="pencil" size={16} color="#0a84ff" />
-                          </Pressable>
-                        </View>
-                      </View>
-                    ) : (
-                      // Mostra i toggle solo se non c'è nulla selezionato
-                      <>
-                        {/* Toggle esistente/nuovo */}
-                        <View>
-                          <Text style={{ fontSize: 14, marginBottom: 8, color: '#666', fontWeight: '600' }}>
-                            Tipo bene:
-                          </Text>
-                          <View style={{ flexDirection: 'row', gap: 8 }}>
-                            <Pressable
-                              onPress={() => setAssetType('new')}
-                              style={{
-                                flex: 1,
-                                padding: 12,
-                                borderRadius: 8,
-                                backgroundColor: assetType === 'new' ? '#0a84ff' : '#fff',
-                                borderWidth: 1,
-                                borderColor: assetType === 'new' ? '#0a84ff' : '#e5e5ea'
-                              }}
-                            >
-                              <Text style={{
-                                color: assetType === 'new' ? '#fff' : '#000',
-                                fontWeight: assetType === 'new' ? '600' : '400',
-                                textAlign: 'center'
-                              }}>
-                                Nuovo
-                              </Text>
-                            </Pressable>
-
-                            <Pressable
-                              onPress={() => setAssetType('existing')}
-                              style={{
-                                flex: 1,
-                                padding: 12,
-                                borderRadius: 8,
-                                backgroundColor: assetType === 'existing' ? '#0a84ff' : '#fff',
-                                borderWidth: 1,
-                                borderColor: assetType === 'existing' ? '#0a84ff' : '#e5e5ea'
-                              }}
-                            >
-                              <Text style={{
-                                color: assetType === 'existing' ? '#fff' : '#000',
-                                fontWeight: assetType === 'existing' ? '600' : '400',
-                                textAlign: 'center'
-                              }}>
-                                Esistente
-                              </Text>
-                            </Pressable>
-                          </View>
-                        </View>
-
-                        {assetType === 'existing' && (
-                          <View>
-                            <Pressable
-                              onPress={() => setShowAssetPicker(true)}
-                              style={{
-                                borderWidth: 1,
-                                borderColor: '#e5e5ea',
-                                borderRadius: 8,
-                                padding: 12,
-                                backgroundColor: '#fff',
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'space-between'
-                              }}
-                            >
-                              <Text style={{ color: '#666' }}>Seleziona bene...</Text>
-                              <Ionicons name="chevron-down" size={20} color="#666" />
-                            </Pressable>
-                          </View>
-                        )}
-
-                        {assetType === 'new' && (
-                          <View style={{ gap: 12 }}>
-                            <View>
-                              <Text style={{ fontSize: 14, marginBottom: 8, color: '#666', fontWeight: '600' }}>
-                                Tipo bene:
-                              </Text>
-                              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                                {[
-                                  { key: 'vehicles', icon: 'car', label: 'Veicoli' },
-                                  { key: 'properties', icon: 'home', label: 'Immobili' },
-                                  { key: 'animals', icon: 'paw', label: 'Animali' },
-                                  { key: 'people', icon: 'person', label: 'Persone' },
-                                  { key: 'devices', icon: 'phone-portrait', label: 'Dispositivi' },
-                                  { key: 'subscriptions', icon: 'card', label: 'Abbonamenti' },
-                                  { key: 'other', icon: 'cube', label: 'Altro' }
-                                ].map((category) => (
-                                  <Pressable
-                                    key={category.key}
-                                    onPress={() => setNewAssetType(category.key as any)}
-                                    style={{
-                                      flex: 1,
-                                      minWidth: '30%',
-                                      padding: 10,
-                                      borderRadius: 8,
-                                      backgroundColor: newAssetType === category.key ? '#0a84ff' : '#fff',
-                                      borderWidth: 1,
-                                      borderColor: newAssetType === category.key ? '#0a84ff' : '#e5e5ea',
-                                      alignItems: 'center'
-                                    }}
-                                  >
-                                    <Ionicons 
-                                      name={category.icon as any} 
-                                      size={20} 
-                                      color={newAssetType === category.key ? '#fff' : '#000'} 
-                                    />
-                                    <Text style={{
-                                      color: newAssetType === category.key ? '#fff' : '#000',
-                                      fontSize: 11,
-                                      marginTop: 4,
-                                      textAlign: 'center'
-                                    }}>
-                                      {category.label}
-                                    </Text>
-                                  </Pressable>
-                                ))}
-                              </View>
-                            </View>
-
-                            <View>
-                              <Text style={{ fontSize: 14, marginBottom: 8, color: '#666', fontWeight: '600' }}>
-                                Nome bene:
-                              </Text>
-                              <TextInput
-                                value={newAssetName}
-                                onChangeText={setNewAssetName}
-                                style={{
-                                  backgroundColor: '#f2f2f7',
-                                  borderRadius: 8,
-                                  padding: 12,
-                                  fontSize: 16,
-                                  borderWidth: 0
-                                }}
-                              />
-                            </View>
-
-                            <View>
-                              <Text style={{ fontSize: 14, marginBottom: 8, color: '#666', fontWeight: '600' }}>
-                                Identificativo
-                              </Text>
-                              <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
-                                {newAssetType === 'vehicles' ? 'Targa (es: AB123CD)' : newAssetType === 'properties' ? 'Indirizzo' : newAssetType === 'animals' ? 'Codice o identificativo' : newAssetType === 'people' ? 'Codice fiscale o documento' : newAssetType === 'devices' ? 'Numero di serie o IMEI' : newAssetType === 'subscriptions' ? 'Codice abbonamento' : 'Codice o identificativo'} (opzionale)
-                              </Text>
-                              <TextInput
-                                value={newAssetIdentifier}
-                                onChangeText={setNewAssetIdentifier}
-                                style={{
-                                  backgroundColor: '#f2f2f7',
-                                  borderRadius: 8,
-                                  padding: 12,
-                                  fontSize: 16,
-                                  borderWidth: 0
-                                }}
-                              />
-                            </View>
-                          </View>
-                        )}
-                      </>
-              )}
-            </View>
-          )}
-        </View>
-
-              {/* Sezione scadenza associata */}
-              <View style={{
-                borderWidth: 1,
-                borderColor: '#d1d1d6',
-                borderRadius: 12,
-                padding: 16,
-                backgroundColor: '#fff'
-              }}>
-                <View style={{ 
-                  flexDirection: 'row', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center',
-                  marginBottom: createDeadline ? 16 : 0
-                }}>
-                  <Text style={{ fontSize: 16, fontWeight: '600' }}>
-                    Crea scadenza associata
-                  </Text>
-                  <Switch
-                    value={createDeadline}
-                    onValueChange={setCreateDeadline}
-                    trackColor={{ false: '#e5e5ea', true: '#34c759' }}
-                    thumbColor="#fff"
-                  />
-                </View>
-
-                {createDeadline && (
-                  <View style={{ gap: 12 }}>
-                    <View>
-                      <Text style={{ fontSize: 14, marginBottom: 8, color: '#666', fontWeight: '600' }}>
-                        Titolo scadenza:
-                      </Text>
-                      <TextInput
-                        value={deadlineTitle}
-                        onChangeText={setDeadlineTitle}
-                        style={{
-                          backgroundColor: '#f2f2f7',
-                          borderRadius: 8,
-                          padding: 12,
-                          fontSize: 16,
-                          borderWidth: 0
-                        }}
-                      />
-                    </View>
-
-                    <View>
-                      <Text style={{ fontSize: 14, marginBottom: 8, color: '#666', fontWeight: '600' }}>
-                        Data scadenza:
-                      </Text>
-                      <Pressable
-                        onPress={() => setShowDatePicker(true)}
-                        style={{
-                          borderWidth: 1,
-                          borderColor: '#e5e5ea',
-                          borderRadius: 8,
-                          padding: 12,
-                          backgroundColor: '#fff',
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          justifyContent: 'space-between'
-                        }}
-                      >
-                        <Text>{deadlineDate.toLocaleDateString('it-IT')}</Text>
-                        <Ionicons name="calendar" size={20} color="#0a84ff" />
+                        <Ionicons name="close" size={12} color="#fff" />
                       </Pressable>
                     </View>
-
-                    {showDatePicker && (
-                      <DateTimePicker
-                        value={deadlineDate}
-                        mode="date"
-                        display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                        onChange={handleDateChange}
-                        minimumDate={new Date()}
-                        themeVariant="light"
-                        style={Platform.OS === 'ios' ? { backgroundColor: '#ffffff' } : undefined}
-                      />
-                    )}
-
-                    <View>
-                      <Text style={{ fontSize: 14, marginBottom: 8, color: '#666', fontWeight: '600' }}>
-                        Note scadenza
-                      </Text>
-                      <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
-                        Note aggiuntive (opzionale)
-                      </Text>
-                      <TextInput
-                        value={deadlineNotes}
-                        onChangeText={setDeadlineNotes}
-                        multiline
-                        numberOfLines={2}
-                        style={{
-                          backgroundColor: '#f2f2f7',
-                          borderRadius: 8,
-                          padding: 12,
-                          height: 60,
-                          fontSize: 16,
-                          borderWidth: 0,
-                          textAlignVertical: 'top'
-                        }}
-                      />
-                    </View>
-
-                    <View style={{ 
-                      flexDirection: 'row', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center'
-                    }}>
-                      <View>
-                        <Text style={{ fontSize: 14, fontWeight: '600' }}>
-                          Scadenza ricorrente
-                        </Text>
-                        <Text style={{ fontSize: 12, color: '#666', marginTop: 2 }}>
-                          Si ripete automaticamente
-                        </Text>
-                      </View>
-                      <Switch
-                        value={isRecurring}
-                        onValueChange={setIsRecurring}
-                        trackColor={{ false: '#e5e5ea', true: '#34c759' }}
-                        thumbColor="#fff"
-                      />
-                    </View>
-
-                    {isRecurring && (
-                      <View>
-                        <Text style={{ fontSize: 14, marginBottom: 8, color: '#666', fontWeight: '600' }}>
-                          Frequenza ricorrenza:
-                        </Text>
-          <Pressable
-                          onPress={() => {
-                            if (Platform.OS === 'ios') {
-                              const options = ['Annulla', ...Object.values(RECURRENCE_TEMPLATES).map(t => t.label)];
-                              ActionSheetIOS.showActionSheetWithOptions(
-                                {
-                                  options,
-                                  cancelButtonIndex: 0,
-                                  title: 'Seleziona frequenza'
-                                },
-                                (buttonIndex) => {
-                                  if (buttonIndex > 0) {
-                                    const keys = Object.keys(RECURRENCE_TEMPLATES) as (keyof typeof RECURRENCE_TEMPLATES)[];
-                                    setSelectedRecurrence(keys[buttonIndex - 1]);
-                                  }
-                                }
-                              );
-                            }
-                          }}
-                          style={{
-                            padding: 12,
-                            borderRadius: 8,
-                            backgroundColor: '#fff',
-                            borderWidth: 1,
-                            borderColor: '#e5e5ea',
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            justifyContent: 'space-between'
-                          }}
-                        >
-                          <Text style={{ color: '#000', fontWeight: '400' }}>
-                            {RECURRENCE_TEMPLATES[selectedRecurrence].label}
-                          </Text>
-                          <Ionicons name="chevron-down" size={20} color="#666" />
-          </Pressable>
-                      </View>
-                    )}
-                  </View>
-                )}
-              </View>
+                  ))}
+                </View>
+              )}
             </View>
 
-            <View style={{ flexDirection: 'row', gap: 12, paddingTop: 24 }}>
-              <Pressable 
-                onPress={() => { 
-                  setIsCreating(false);
-                  reset(); 
-                  onClose(); 
-                }} 
-                disabled={isCreating}
-                style={{ 
-                  flex: 1, 
-                  padding: 16, 
-                  borderRadius: 12, 
-                  backgroundColor: isCreating ? '#f8f8f8' : '#f2f2f7', 
-                  alignItems: 'center',
-                  opacity: isCreating ? 0.5 : 1
-                }}
-              >
-                <Text style={{ fontWeight: '600', color: isCreating ? '#999' : '#000' }}>Annulla</Text>
-              </Pressable>
-          <Pressable
-            onPress={handleSave}
-                disabled={isCreating}
-                style={{ 
-                  flex: 1, 
-                  padding: 16, 
-                  borderRadius: 12, 
-                  backgroundColor: isCreating ? '#80a8ff' : '#0a84ff', 
-                  alignItems: 'center',
-                  opacity: isCreating ? 0.8 : 1
-                }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  {isCreating && (
-                    <View style={{
-                      width: 16,
-                      height: 16,
-                      borderWidth: 2,
-                      borderColor: '#fff',
-                      borderTopColor: 'transparent',
-                      borderRadius: 8,
-                      // Simula un spinner con una rotazione (non animato)
-                    }} />
-                  )}
-                  <Text style={{ color: '#fff', fontWeight: '600' }}>
-                    {isCreating ? 'Creazione...' : (hasAsset || createDeadline) ? 'Crea con collegamenti' : 'Crea'}
-                  </Text>
+            {/* Beni Associati */}
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ 
+                fontSize: 16, 
+                fontWeight: '600', 
+                color: Colors.light.text,
+                marginBottom: 12,
+                marginLeft: 4
+              }}>
+                Beni Associati
+              </Text>
+              
+              {/* Beni selezionati */}
+              {selectedAssets.length > 0 && (
+                <View style={{ 
+                  backgroundColor: Colors.light.cardBackground,
+                  borderRadius: 16,
+                  padding: 16,
+                  marginBottom: 12,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 1,
+                  elevation: 1
+                }}>
+                  {selectedAssets.map((asset) => (
+                    <View key={asset.id} style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: 8,
+                      borderBottomWidth: 0.33,
+                      borderBottomColor: Colors.light.border
+                    }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                        <Ionicons 
+                          name={
+                            asset.type === 'vehicle' ? 'car' : 
+                            asset.type === 'property' || asset.type === 'home' ? 'home' : 
+                            asset.type === 'animal' ? 'paw' :
+                            asset.type === 'person' ? 'person' :
+                            asset.type === 'device' ? 'phone-portrait' :
+                            asset.type === 'subscription' ? 'card' :
+                            'cube'
+                          } 
+                          size={20} 
+                          color={Colors.light.tint} 
+                        />
+                        <Text style={{
+                          fontSize: 16,
+                          color: Colors.light.text,
+                          marginLeft: 12,
+                          flex: 1
+                        }}>
+                          {asset.name}
+                        </Text>
+                      </View>
+                      <Pressable
+                        onPress={() => removeAsset(asset.id)}
+                        style={{
+                          padding: 4
+                        }}
+                      >
+                        <Ionicons name="close" size={16} color={Colors.light.textSecondary} />
+                      </Pressable>
+                    </View>
+                  ))}
                 </View>
+              )}
+
+              {/* Pulsante per aggiungere beni */}
+              <Pressable
+                onPress={() => setShowAssetPicker(true)}
+                style={{ 
+                  backgroundColor: Colors.light.cardBackground,
+                  borderRadius: 16,
+                  padding: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 1,
+                  elevation: 1
+                }}
+              >
+                <Text style={{ 
+                  fontSize: 16,
+                  color: Colors.light.text
+                }}>
+                  {selectedAssets.length > 0 ? `Aggiungi altri beni (${selectedAssets.length} selezionati)` : 'Aggiungi beni'}
+                </Text>
+                <Ionicons name="add" size={20} color={Colors.light.tint} />
+              </Pressable>
+            </View>
+
+            {/* Scadenza Associata */}
+            <View style={{ marginBottom: 12 }}>
+              <Text style={{ 
+                fontSize: 16, 
+                fontWeight: '600', 
+                color: Colors.light.text,
+                marginBottom: 12,
+                marginLeft: 4
+              }}>
+                Scadenza Associata
+              </Text>
+              
+              {/* Scadenza selezionata */}
+              {createDeadline && (
+                <View style={{ 
+                  backgroundColor: Colors.light.cardBackground,
+                  borderRadius: 16,
+                  padding: 16,
+                  marginBottom: 12,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 1,
+                  elevation: 1
+                }}>
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingVertical: 8,
+                    borderBottomWidth: 0.33,
+                    borderBottomColor: Colors.light.border
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                      <Ionicons name="calendar" size={20} color={Colors.light.tint} />
+                      <Text style={{
+                        fontSize: 16,
+                        color: Colors.light.text,
+                        marginLeft: 12,
+                        flex: 1
+                      }}>
+                        {deadlineTitle || 'Nuova scadenza'}
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={() => setCreateDeadline(false)}
+                      style={{
+                        padding: 4
+                      }}
+                    >
+                      <Ionicons name="close" size={16} color={Colors.light.textSecondary} />
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+
+              {/* Pulsante per aggiungere scadenza */}
+              <Pressable
+                onPress={() => setCreateDeadline(true)}
+                style={{ 
+                  backgroundColor: Colors.light.cardBackground,
+                  borderRadius: 16,
+                  padding: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 1,
+                  elevation: 1
+                }}
+              >
+                <Text style={{ 
+                  fontSize: 16,
+                  color: Colors.light.text
+                }}>
+                  {createDeadline ? 'Modifica scadenza' : 'Crea scadenza associata'}
+                </Text>
+                <Ionicons name="add" size={20} color={Colors.light.tint} />
               </Pressable>
             </View>
           </View>
         </ScrollView>
 
-        <Modal visible={showAssetPicker} animationType="slide" presentationStyle="pageSheet">
-          <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
-            <View style={{ padding: 16 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <Text style={{ fontSize: 20, fontWeight: '700' }}>Seleziona bene</Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
+        {/* Modal per creazione scadenza associata */}
+        <Modal visible={createDeadline} animationType="slide" presentationStyle="pageSheet">
+          <SafeAreaView style={{ flex: 1, backgroundColor: Colors.light.background }}>
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              borderBottomWidth: 0.33,
+              borderBottomColor: Colors.light.border,
+              backgroundColor: Colors.light.cardBackground
+            }}>
+              <Pressable onPress={() => setCreateDeadline(false)}>
+                <Text style={{ 
+                  fontSize: 16, 
+                  color: Colors.light.textSecondary, 
+                  fontWeight: '600' 
+                }}>
+                  Annulla
+                </Text>
+              </Pressable>
+              
+              <Text style={{
+                fontSize: 17,
+                fontWeight: '600',
+                color: Colors.light.text
+              }}>
+                Crea Scadenza
+              </Text>
 
-                  <Pressable 
-                    onPress={() => {
-                      setShowAssetPicker(false);
-                      // Se non c'è un asset selezionato, disattiva lo switch
-                      if (!selectedAsset) {
-                        setHasAsset(false);
-                      }
-                    }} 
+              <Pressable onPress={() => setCreateDeadline(false)}>
+                <Text style={{ 
+                  fontSize: 16, 
+                  color: Colors.light.tint, 
+                  fontWeight: '600' 
+                }}>
+                  Fatto
+                </Text>
+              </Pressable>
+            </View>
+
+            <ScrollView 
+              style={{ flex: 1 }} 
+              contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={{ gap: 12 }}>
+                {/* Titolo Scadenza */}
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ 
+                    fontSize: 16, 
+                    fontWeight: '600', 
+                    color: Colors.light.text,
+                    marginBottom: 12,
+                    marginLeft: 4
+                  }}>
+                    Titolo *
+                  </Text>
+                  <TextInput
+                    value={deadlineTitle}
+                    onChangeText={setDeadlineTitle}
                     style={{ 
-                      width: 36,
-                      height: 36,
-                      backgroundColor: '#f2f2f7',
-                      borderRadius: 18,
+                      backgroundColor: Colors.light.cardBackground,
+                      borderRadius: 16,
+                      padding: 16,
+                      fontSize: 16,
+                      color: Colors.light.text,
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.05,
+                      shadowRadius: 1,
+                      elevation: 1
+                    }}
+                  />
+                </View>
+
+                {/* Data Scadenza */}
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ 
+                    fontSize: 16, 
+                    fontWeight: '600', 
+                    color: Colors.light.text,
+                    marginBottom: 12,
+                    marginLeft: 4
+                  }}>
+                    Data Scadenza *
+                  </Text>
+                  <Pressable
+                    onPress={() => setShowDatePicker(true)}
+                    style={{ 
+                      backgroundColor: Colors.light.cardBackground,
+                      borderRadius: 16,
+                      padding: 16,
+                      flexDirection: 'row',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'space-between',
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.05,
+                      shadowRadius: 1,
+                      elevation: 1
                     }}
                   >
-                    <Ionicons name="close" size={18} color="#666" />
-          </Pressable>
-        </View>
-      </View>
+                    <Text style={{ 
+                      fontSize: 16,
+                      color: Colors.light.text
+                    }}>
+                      {deadlineDate.toLocaleDateString('it-IT')}
+                    </Text>
+                    <Ionicons name="calendar" size={20} color={Colors.light.tint} />
+                  </Pressable>
+                </View>
+
+                {/* Note */}
+                <View style={{ marginBottom: 12 }}>
+                  <Text style={{ 
+                    fontSize: 16, 
+                    fontWeight: '600', 
+                    color: Colors.light.text,
+                    marginBottom: 12,
+                    marginLeft: 4
+                  }}>
+                    Note
+                  </Text>
+                  <TextInput
+                    value={deadlineNotes}
+                    onChangeText={setDeadlineNotes}
+                    multiline
+                    numberOfLines={3}
+                    style={{ 
+                      backgroundColor: Colors.light.cardBackground,
+                      borderRadius: 16,
+                      padding: 16,
+                      fontSize: 16,
+                      color: Colors.light.text,
+                      shadowColor: '#000',
+                      shadowOffset: { width: 0, height: 1 },
+                      shadowOpacity: 0.05,
+                      shadowRadius: 1,
+                      elevation: 1,
+                      textAlignVertical: 'top'
+                    }}
+                  />
+                </View>
+
+                {/* Scadenza Ricorrente */}
+                <View style={{
+                  backgroundColor: Colors.light.cardBackground,
+                  borderRadius: 16,
+                  padding: 20,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 1,
+                  elevation: 1
+                }}>
+                  <View style={{ 
+                    flexDirection: 'row', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    marginBottom: isRecurring ? 16 : 0
+                  }}>
+                    <Text style={{ 
+                      fontSize: 16, 
+                      fontWeight: '600',
+                      color: Colors.light.text
+                    }}>
+                      Scadenza ricorrente
+                    </Text>
+                    <Switch
+                      value={isRecurring}
+                      onValueChange={setIsRecurring}
+                      trackColor={{ false: Colors.light.border, true: Colors.light.tint }}
+                      thumbColor="#fff"
+                    />
+                  </View>
+
+                  {isRecurring && (
+                    <View style={{ gap: 8 }}>
+                      {recurrenceKeys.map((key) => (
+                        <Pressable
+                          key={key}
+                          onPress={() => setSelectedRecurrence(key)}
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            paddingVertical: 8,
+                            paddingHorizontal: 12,
+                            borderRadius: 6,
+                            backgroundColor: selectedRecurrence === key ? Colors.light.tint + '15' : 'transparent'
+                          }}
+                        >
+                          <View style={{
+                            width: 16,
+                            height: 16,
+                            borderRadius: 8,
+                            borderWidth: 2,
+                            borderColor: selectedRecurrence === key ? Colors.light.tint : Colors.light.border,
+                            backgroundColor: selectedRecurrence === key ? Colors.light.tint : 'transparent',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            marginRight: 8
+                          }}>
+                            {selectedRecurrence === key && (
+                              <Ionicons name="checkmark" size={10} color="#fff" />
+                            )}
+                          </View>
+                          <Text style={{
+                            fontSize: 14,
+                            color: Colors.light.text,
+                            fontWeight: selectedRecurrence === key ? '600' : '400'
+                          }}>
+                            {RECURRENCE_TEMPLATES[key].label}
+                          </Text>
+                        </Pressable>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              </View>
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
+
+        {/* Date Picker */}
+        {showDatePicker && (
+          <DateTimePicker
+            value={deadlineDate}
+            mode="date"
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            onChange={handleDateChange}
+            minimumDate={new Date()}
+          />
+        )}
+
+        {/* Modal per selezione beni */}
+        <Modal visible={showAssetPicker} animationType="slide" presentationStyle="pageSheet">
+          <SafeAreaView style={{ flex: 1, backgroundColor: Colors.light.background }}>
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              borderBottomWidth: 0.33,
+              borderBottomColor: Colors.light.border,
+              backgroundColor: Colors.light.cardBackground
+            }}>
+              <Pressable onPress={() => setShowAssetPicker(false)}>
+                <Text style={{ 
+                  fontSize: 16, 
+                  color: Colors.light.textSecondary, 
+                  fontWeight: '600' 
+                }}>
+                  Annulla
+                </Text>
+              </Pressable>
+              
+              <Text style={{
+                fontSize: 17,
+                fontWeight: '600',
+                color: Colors.light.text
+              }}>
+                Seleziona Bene
+              </Text>
+
+              <Pressable onPress={() => setShowAssetPicker(false)}>
+                <Text style={{ 
+                  fontSize: 16, 
+                  color: Colors.light.tint, 
+                  fontWeight: '600' 
+                }}>
+                  Fatto
+                </Text>
+              </Pressable>
+            </View>
+
+            <View style={{ padding: 16 }}>
               <TextInput
                 value={assetSearch}
                 onChangeText={setAssetSearch}
+                placeholder="Cerca beni..."
                 style={{ 
-                  backgroundColor: '#f2f2f7',
-                  borderRadius: 12, 
-                  padding: 12,
+                  backgroundColor: Colors.light.cardBackground,
+                  borderRadius: 16,
+                  padding: 16,
                   fontSize: 16,
-                  borderWidth: 0,
-                  marginBottom: 16
+                  color: Colors.light.text,
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 1,
+                  elevation: 1
                 }}
               />
             </View>
@@ -1053,10 +977,25 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
                 <Pressable
-                  onPress={() => { setSelectedAsset(item); setShowAssetPicker(false); }}
-                  style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: '#e5e5ea', flexDirection: 'row', alignItems: 'center', gap: 12 }}
+                  onPress={() => handleAssetSelection(item)}
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    paddingHorizontal: 16,
+                    paddingVertical: 12,
+                    borderBottomWidth: 0.33,
+                    borderBottomColor: Colors.light.border
+                  }}
                 >
-                  <View style={{ width: 40, height: 40, borderRadius: 10, backgroundColor: Colors.light.tint, alignItems: 'center', justifyContent: 'center' }}>
+                  <View style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: 10,
+                    backgroundColor: Colors.light.tint,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    marginRight: 12
+                  }}>
                     <Ionicons name={
                       item.type === 'vehicle' ? 'car' : 
                       item.type === 'property' || item.type === 'home' ? 'home' : 
@@ -1065,26 +1004,32 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
                       item.type === 'device' ? 'phone-portrait' :
                       item.type === 'subscription' ? 'card' :
                       'cube'
-                    } size={20} color={'#fff'} />
+                    } size={20} color="#fff" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 16, fontWeight: '600' }}>{item.name}</Text>
-                    {item.identifier && <Text style={{ fontSize: 14, color: '#666' }}>{item.identifier}</Text>}
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: Colors.light.text }}>
+                      {item.name}
+                    </Text>
+                    {item.identifier && (
+                      <Text style={{ fontSize: 14, color: Colors.light.textSecondary }}>
+                        {item.identifier}
+                      </Text>
+                    )}
                   </View>
                 </Pressable>
               )}
               ListEmptyComponent={() => (
                 <View style={{ padding: 32, alignItems: 'center' }}>
-                  <Text style={{ color: '#666', textAlign: 'center' }}>{assetSearch ? 'Nessun bene trovato' : 'Nessun bene disponibile'}</Text>
+                  <Text style={{ color: Colors.light.textSecondary, textAlign: 'center' }}>
+                    {assetSearch ? 'Nessun bene trovato' : 'Nessun bene disponibile'}
+                  </Text>
                 </View>
               )}
             />
           </SafeAreaView>
         </Modal>
 
-
-
-        {/* Modale di loading */}
+        {/* Modal di loading */}
         <Modal 
           visible={isCreating} 
           transparent={true}
@@ -1097,7 +1042,7 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
             alignItems: 'center'
           }}>
             <View style={{
-              backgroundColor: '#fff',
+              backgroundColor: Colors.light.cardBackground,
               borderRadius: 16,
               padding: 24,
               alignItems: 'center',
@@ -1112,16 +1057,15 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
                 width: 40,
                 height: 40,
                 borderWidth: 3,
-                borderColor: '#e5e5ea',
-                borderTopColor: '#0a84ff',
+                borderColor: Colors.light.border,
+                borderTopColor: Colors.light.tint,
                 borderRadius: 20,
-                marginBottom: 16,
-                // In una vera implementazione, questo avrebbe un'animazione di rotazione
+                marginBottom: 16
               }} />
               <Text style={{
                 fontSize: 16,
                 fontWeight: '600',
-                color: '#000',
+                color: Colors.light.text,
                 marginBottom: 8,
                 textAlign: 'center'
               }}>
@@ -1129,7 +1073,7 @@ export const AddDocumentModal = React.forwardRef<AddDocumentModalRef, {
               </Text>
               <Text style={{
                 fontSize: 14,
-                color: '#666',
+                color: Colors.light.textSecondary,
                 textAlign: 'center',
                 lineHeight: 20
               }}>

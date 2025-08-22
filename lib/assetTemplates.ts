@@ -21,12 +21,12 @@ export const ASSET_TEMPLATES = {
     icon: 'car',
     items: [
       { key: 'car', name: 'Auto', icon: 'car' },
-      { key: 'motorcycle', name: 'Moto', icon: 'bicycle' },
-      { key: 'scooter', name: 'Scooter', icon: 'bicycle' },
-      { key: 'bicycle', name: 'Bicicletta', icon: 'bicycle' },
-      { key: 'scooter_electric', name: 'Monopattino', icon: 'walk' },
-      { key: 'rv', name: 'Camper', icon: 'bus' },
-      { key: 'boat', name: 'Barca', icon: 'boat' },
+      { key: 'motorcycle', name: 'Moto', icon: 'bike' },
+      { key: 'scooter', name: 'Scooter', icon: 'moped' },
+      { key: 'bicycle', name: 'Bicicletta', icon: 'bicycle-basket' },
+      { key: 'scooter_electric', name: 'Monopattino', icon: 'scooter' },
+      { key: 'rv', name: 'Camper', icon: 'caravan' },
+      { key: 'boat', name: 'Barca', icon: 'ferry' },
       { key: 'custom', name: 'Altro', icon: 'car' }
     ]
   },
@@ -35,109 +35,109 @@ export const ASSET_TEMPLATES = {
     icon: 'home',
     items: [
       { key: 'primary_home', name: 'Prima casa', icon: 'home' },
-      { key: 'secondary_home', name: 'Seconda casa', icon: 'home' },
-      { key: 'vacation_home', name: 'Casa vacanze', icon: 'home' },
-      { key: 'rental_apartment', name: 'Appartamento in affitto', icon: 'business' },
-      { key: 'garage', name: 'Garage', icon: 'storefront' },
-      { key: 'cellar', name: 'Cantina', icon: 'storefront' },
+      { key: 'secondary_home', name: 'Seconda casa', icon: 'home-variant' },
+      { key: 'vacation_home', name: 'Casa vacanze', icon: 'home-heart' },
+      { key: 'rental_apartment', name: 'Appartamento in affitto', icon: 'domain' },
+      { key: 'garage', name: 'Garage', icon: 'garage' },
+      { key: 'cellar', name: 'Cantina', icon: 'archive' },
       { key: 'custom', name: 'Altro', icon: 'home' }
     ]
   },
   device: {
     label: 'Dispositivo',
-    icon: 'phone-portrait',
+    icon: 'cellphone',
     items: [
-      { key: 'smartphone', name: 'Smartphone', icon: 'phone-portrait' },
+      { key: 'smartphone', name: 'Smartphone', icon: 'cellphone' },
       { key: 'laptop', name: 'Laptop', icon: 'laptop' },
-      { key: 'tablet', name: 'Tablet', icon: 'tablet-portrait' },
+      { key: 'tablet', name: 'Tablet', icon: 'tablet' },
       { key: 'smartwatch', name: 'Smartwatch', icon: 'watch' },
-      { key: 'console', name: 'Console', icon: 'game-controller' },
-      { key: 'printer', name: 'Stampante', icon: 'print' },
-      { key: 'custom', name: 'Altro', icon: 'phone-portrait' }
+      { key: 'console', name: 'Console', icon: 'gamepad-variant' },
+      { key: 'printer', name: 'Stampante', icon: 'printer' },
+      { key: 'custom', name: 'Altro', icon: 'cellphone' }
     ]
   },
   appliance: {
     label: 'Elettrodomestico',
-    icon: 'tv',
+    icon: 'television',
     items: [
-      { key: 'washing_machine', name: 'Lavatrice', icon: 'tv' },
-      { key: 'refrigerator', name: 'Frigorifero', icon: 'tv' },
-      { key: 'dishwasher', name: 'Lavastoviglie', icon: 'tv' },
-      { key: 'oven', name: 'Forno', icon: 'tv' },
-      { key: 'microwave', name: 'Microonde', icon: 'tv' },
-      { key: 'television', name: 'Televisione', icon: 'tv' },
-      { key: 'vacuum', name: 'Aspirapolvere', icon: 'tv' },
-      { key: 'custom', name: 'Altro', icon: 'tv' }
+      { key: 'washing_machine', name: 'Lavatrice', icon: 'washing-machine' },
+      { key: 'refrigerator', name: 'Frigorifero', icon: 'fridge' },
+      { key: 'dishwasher', name: 'Lavastoviglie', icon: 'dishwasher' },
+      { key: 'oven', name: 'Forno', icon: 'stove' },
+      { key: 'microwave', name: 'Microonde', icon: 'microwave' },
+      { key: 'television', name: 'Televisione', icon: 'television' },
+      { key: 'vacuum', name: 'Aspirapolvere', icon: 'vacuum' },
+      { key: 'custom', name: 'Altro', icon: 'television' }
     ]
   },
   animal: {
     label: 'Animale',
     icon: 'paw',
     items: [
-      { key: 'dog', name: 'Cane', icon: 'paw' },
-      { key: 'cat', name: 'Gatto', icon: 'paw' },
-      { key: 'rabbit', name: 'Coniglio', icon: 'paw' },
-      { key: 'horse', name: 'Cavallo', icon: 'paw' },
-      { key: 'bird', name: 'Uccello', icon: 'paw' },
+      { key: 'dog', name: 'Cane', icon: 'dog-side' },
+      { key: 'cat', name: 'Gatto', icon: 'cat' },
+      { key: 'rabbit', name: 'Coniglio', icon: 'rabbit' },
+      { key: 'horse', name: 'Cavallo', icon: 'horse-variant' },
+      { key: 'bird', name: 'Uccello', icon: 'bird' },
       { key: 'custom', name: 'Altro', icon: 'paw' }
     ]
   },
   person: {
     label: 'Persona',
-    icon: 'person',
+    icon: 'account',
     items: [
-      { key: 'child', name: 'Figlio', icon: 'person' },
-      { key: 'partner', name: 'Partner', icon: 'people' },
-      { key: 'parent', name: 'Genitore', icon: 'person' },
-      { key: 'grandparent', name: 'Nonno/a', icon: 'person' },
-      { key: 'care_person', name: 'Persona assistita', icon: 'person' },
-      { key: 'custom', name: 'Altro', icon: 'person' }
+      { key: 'child', name: 'Figlio', icon: 'human-male-child' },
+      { key: 'partner', name: 'Partner', icon: 'account-heart' },
+      { key: 'parent', name: 'Genitore', icon: 'account-supervisor' },
+      { key: 'grandparent', name: 'Nonno/a', icon: 'account-multiple' },
+      { key: 'care_person', name: 'Persona assistita', icon: 'account-injury' },
+      { key: 'custom', name: 'Altro', icon: 'account' }
     ]
   },
   subscription: {
     label: 'Abbonamento',
-    icon: 'card',
+    icon: 'credit-card',
     items: [
-      { key: 'netflix', name: 'Netflix', icon: 'play' },
-      { key: 'amazon_prime', name: 'Amazon Prime', icon: 'play' },
-      { key: 'spotify', name: 'Spotify', icon: 'musical-notes' },
-      { key: 'gym', name: 'Palestra', icon: 'fitness' },
+      { key: 'netflix', name: 'Netflix', icon: 'netflix' },
+      { key: 'amazon_prime', name: 'Amazon Prime', icon: 'package' },
+      { key: 'spotify', name: 'Spotify', icon: 'spotify' },
+      { key: 'gym', name: 'Palestra', icon: 'dumbbell' },
       { key: 'transport', name: 'Trasporti', icon: 'bus' },
-      { key: 'health_insurance', name: 'Assicurazione sanitaria privata', icon: 'medical' },
-      { key: 'custom', name: 'Altro', icon: 'card' }
+      { key: 'health_insurance', name: 'Assicurazione sanitaria privata', icon: 'medical-bag' },
+      { key: 'custom', name: 'Altro', icon: 'credit-card' }
     ]
   },
   property: {
     label: 'Proprietà',
-    icon: 'business',
+    icon: 'office-building',
     items: [
-      { key: 'land', name: 'Terreno', icon: 'leaf' },
-      { key: 'garage', name: 'Garage', icon: 'storefront' },
-      { key: 'car_box', name: 'Box auto', icon: 'storefront' },
-      { key: 'parking_spot', name: 'Posto auto', icon: 'storefront' },
-      { key: 'cellar', name: 'Cantina', icon: 'storefront' },
-      { key: 'property_share', name: 'Quota immobile', icon: 'business' },
-      { key: 'custom', name: 'Altro', icon: 'business' }
+      { key: 'land', name: 'Terreno', icon: 'grass' },
+      { key: 'garage', name: 'Garage', icon: 'garage' },
+      { key: 'car_box', name: 'Box auto', icon: 'garage-open' },
+      { key: 'parking_spot', name: 'Posto auto', icon: 'parking' },
+      { key: 'cellar', name: 'Cantina', icon: 'archive' },
+      { key: 'property_share', name: 'Quota immobile', icon: 'office-building' },
+      { key: 'custom', name: 'Altro', icon: 'office-building' }
     ]
   },
   investment: {
     label: 'Investimento',
     icon: 'trending-up',
     items: [
-      { key: 'stocks', name: 'Azioni', icon: 'trending-up' },
-      { key: 'etf', name: 'ETF', icon: 'stats-chart' },
-      { key: 'crypto', name: 'Criptovalute', icon: 'logo-bitcoin' },
-      { key: 'mutual_funds', name: 'Fondi comuni', icon: 'stats-chart' },
-      { key: 'pension_plan', name: 'Piani pensionistici', icon: 'time' },
-      { key: 'bonds', name: 'Obbligazioni', icon: 'document-text' },
+      { key: 'stocks', name: 'Azioni', icon: 'chart-line' },
+      { key: 'etf', name: 'ETF', icon: 'chart-areaspline' },
+      { key: 'crypto', name: 'Criptovalute', icon: 'bitcoin' },
+      { key: 'mutual_funds', name: 'Fondi comuni', icon: 'chart-pie' },
+      { key: 'pension_plan', name: 'Piani pensionistici', icon: 'clock-time-four' },
+      { key: 'bonds', name: 'Obbligazioni', icon: 'file-document' },
       { key: 'custom', name: 'Altro', icon: 'trending-up' }
     ]
   },
   other: {
     label: 'Altro',
-    icon: 'cube',
+    icon: 'package-variant',
     items: [
-      { key: 'custom', name: 'Personalizzato', icon: 'cube' }
+      { key: 'custom', name: 'Personalizzato', icon: 'package-variant' }
     ]
   }
 } as const;

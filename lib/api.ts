@@ -417,6 +417,8 @@ export async function createDeadlineWithAssociations(input: {
   assetId?: string;
   isRecurring?: boolean;
   recurrenceRule?: string;
+  selectedAssets?: any[];
+  selectedDocuments?: any[];
 
   associatedDocument?: {
     title: string;
@@ -435,7 +437,35 @@ export async function createDeadlineWithAssociations(input: {
     recurrenceRule: input.recurrenceRule
   });
 
-  // 3. Crea o collega il documento se richiesto
+  // 3. Collega i beni selezionati
+  if (input.selectedAssets && input.selectedAssets.length > 0) {
+    const assetAssociations = input.selectedAssets.map(asset => ({
+      deadline_id: deadline.id,
+      asset_id: asset.id
+    }));
+    
+    const { error: assetError } = await supabase
+      .from('deadline_assets')
+      .insert(assetAssociations);
+    
+    if (assetError) throw assetError;
+  }
+
+  // 4. Collega i documenti selezionati
+  if (input.selectedDocuments && input.selectedDocuments.length > 0) {
+    const documentAssociations = input.selectedDocuments.map(document => ({
+      deadline_id: deadline.id,
+      document_id: document.id
+    }));
+    
+    const { error: documentError } = await supabase
+      .from('deadline_documents')
+      .insert(documentAssociations);
+    
+    if (documentError) throw documentError;
+  }
+
+  // 5. Crea o collega il documento se richiesto (per retrocompatibilità)
   if (input.associatedDocument) {
     if ('existingDocumentId' in input.associatedDocument) {
       // Documento esistente - non facciamo nulla qui, il collegamento è implicito attraverso l'asset

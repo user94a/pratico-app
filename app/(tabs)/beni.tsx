@@ -7,17 +7,19 @@ import { Colors } from '@/constants/Colors';
 import { deleteAsset, deleteDeadline, getAllDeadlines, getAssets, updateDeadlineStatus } from '@/lib/api';
 import { getAssetIcon } from '@/lib/assetIcons';
 import { Asset, Deadline, Document } from '@/lib/types';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 
 export default function BeniScreen() {
   const router = useRouter();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastLoadTime, setLastLoadTime] = useState<number | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
 
   const [selectedDeadline, setSelectedDeadline] = useState<Deadline | null>(null);
@@ -49,8 +51,13 @@ export default function BeniScreen() {
     return null;
   }
 
-  async function load() {
+  async function load(forceRefresh = false) {
     try {
+      // Se non è un refresh forzato e abbiamo dati recenti (meno di 30 secondi), non ricaricare
+      if (!forceRefresh && lastLoadTime && (Date.now() - lastLoadTime) < 30000 && assets.length > 0) {
+        return;
+      }
+      
       setLoading(true);
       const [assetsData, deadlinesData] = await Promise.all([
         getAssets(),
@@ -58,6 +65,7 @@ export default function BeniScreen() {
       ]);
       setAssets(assetsData);
       setDeadlines(deadlinesData);
+      setLastLoadTime(Date.now());
     } catch (error) {
       Alert.alert('Errore', 'Impossibile caricare i dati');
     } finally {
@@ -65,13 +73,22 @@ export default function BeniScreen() {
     }
   }
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load(true);
+    setRefreshing(false);
+  };
+
+  // Carica solo al primo focus, non ad ogni cambio tab
   useFocusEffect(useCallback(() => {
-    load();
-  }, []));
+    if (assets.length === 0) {
+      load();
+    }
+  }, [assets.length]));
 
   async function handleCreateAsset(result: { asset: any; deadlines_created: number }) {
     try {
-      await load();
+      await load(true); // Forza refresh dopo creazione
       setShowAddModal(false);
     } catch (e: any) {
       Alert.alert('Errore', e.message);
@@ -81,7 +98,7 @@ export default function BeniScreen() {
   async function handleDeleteAsset(assetId: string) {
     try {
       await deleteAsset(assetId);
-      await load();
+      await load(true); // Forza refresh dopo eliminazione
     } catch (e: any) {
       Alert.alert('Errore', e.message);
     }
@@ -164,83 +181,86 @@ export default function BeniScreen() {
         </Text>
         <View style={{
           backgroundColor: Colors.light.cardBackground,
-          borderRadius: 16,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.05,
-          shadowRadius: 1,
-          elevation: 1,
+          borderRadius: 16
         }}>
           {assets.map((asset, index) => {
             const deadlineStatus = getAssetDeadlineStatus(asset.id, deadlines);
             const isLast = index === assets.length - 1;
             
             return (
-              <Pressable
-                key={asset.id}
-                onPress={() => {
-                  router.push({
-                    pathname: '/asset-detail',
-                    params: { id: asset.id }
-                  });
-                }}
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  padding: 16,
-                  borderBottomWidth: isLast ? 0 : 0.5,
-                  borderBottomColor: Colors.light.border
-                }}
-              >
-                <View style={{ position: 'relative', marginRight: 12 }}>
-                  <View style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 8,
-                    backgroundColor: Colors.light.tint,
+              <View key={asset.id}>
+                <Pressable
+                  onPress={() => {
+                    router.push({
+                      pathname: '/asset-detail',
+                      params: { id: asset.id }
+                    });
+                  }}
+                  style={{
+                    flexDirection: 'row',
                     alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    <Ionicons 
-                      name={getAssetIcon(asset) as any} 
-                      size={18} 
-                      color="#fff" 
-                    />
-                  </View>
-                  {deadlineStatus && (
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    minHeight: 44
+                  }}
+                >
+                  <View style={{ position: 'relative', marginRight: 12 }}>
                     <View style={{
-                      position: 'absolute',
-                      top: -2,
-                      right: -2,
-                      width: 14,
-                      height: 14,
-                      borderRadius: 7,
-                      backgroundColor: deadlineStatus.backgroundColor,
-                      borderWidth: 2,
-                      borderColor: Colors.light.cardBackground
-                    }} />
-                  )}
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={{ 
-                    fontSize: 16, 
-                    fontWeight: '600',
-                    color: Colors.light.text,
-                    marginBottom: 2
-                  }}>
-                    {asset.name}
-                  </Text>
-                  {asset.identifier && (
-                    <Text style={{ 
-                      fontSize: 14, 
-                      color: Colors.light.textSecondary 
+                      width: 29,
+                      height: 29,
+                      borderRadius: 6,
+                      backgroundColor: Colors.light.tint,
+                      alignItems: 'center',
+                      justifyContent: 'center'
                     }}>
-                      {asset.identifier}
+                      <MaterialCommunityIcons 
+                        name={getAssetIcon(asset) as any} 
+                        size={18} 
+                        color="#fff" 
+                      />
+                    </View>
+                    {deadlineStatus && (
+                      <View style={{
+                        position: 'absolute',
+                        top: -2,
+                        right: -2,
+                        width: 12,
+                        height: 12,
+                        borderRadius: 6,
+                        backgroundColor: deadlineStatus.backgroundColor,
+                        borderWidth: 2,
+                        borderColor: Colors.light.cardBackground
+                      }} />
+                    )}
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ 
+                      fontSize: 17, 
+                      fontWeight: '400',
+                      color: Colors.light.text,
+                      marginBottom: asset.identifier ? 2 : 0
+                    }}>
+                      {asset.name}
                     </Text>
-                  )}
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={Colors.light.textSecondary} />
-              </Pressable>
+                    {asset.identifier && (
+                      <Text style={{ 
+                        fontSize: 15, 
+                        color: Colors.light.textSecondary 
+                      }}>
+                        {asset.identifier}
+                      </Text>
+                    )}
+                  </View>
+                  <MaterialCommunityIcons name="chevron-right" size={14} color={Colors.light.textSecondary} />
+                </Pressable>
+                {!isLast && (
+                  <View style={{
+                    height: 0.33,
+                    backgroundColor: Colors.light.border,
+                    marginLeft: 57
+                  }} />
+                )}
+              </View>
             );
           })}
         </View>
@@ -291,37 +311,36 @@ export default function BeniScreen() {
               justifyContent: 'center'
             }}
           >
-            <Ionicons name="add" size={20} color="#fff" />
+            <MaterialCommunityIcons name="plus" size={20} color="#fff" />
           </Pressable>
         </View>
 
         {/* Search */}
         <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
           <View style={{
-            backgroundColor: Colors.light.cardBackground,
-            borderRadius: 12,
+            backgroundColor: '#e5e5ea',
+            borderRadius: 10,
             paddingHorizontal: 12,
-            paddingVertical: 10,
+            paddingVertical: 8,
             flexDirection: 'row',
-            alignItems: 'center',
-            borderColor: Colors.light.border,
-            borderWidth: 0.5
+            alignItems: 'center'
           }}>
-            <Ionicons name="search" size={20} color={Colors.light.textSecondary} style={{ marginRight: 8 }} />
+            <Ionicons name="search" size={17} color="#8e8e93" style={{ marginRight: 8 }} />
             <TextInput
               value={search}
               onChangeText={setSearch}
               style={{ 
                 flex: 1, 
-                fontSize: 16,
-                color: Colors.light.text
+                fontSize: 17,
+                color: Colors.light.text,
+                paddingVertical: 4
               }}
-              placeholder="Cerca beni..."
-              placeholderTextColor={Colors.light.textSecondary}
+              placeholder="Cerca"
+              placeholderTextColor="#8e8e93"
             />
             {search.length > 0 && (
               <Pressable onPress={() => setSearch('')}>
-                <Ionicons name="close-circle" size={20} color={Colors.light.textSecondary} />
+                <MaterialCommunityIcons name="close-circle" size={17} color="#8e8e93" />
               </Pressable>
             )}
           </View>
@@ -332,6 +351,13 @@ export default function BeniScreen() {
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 16 }}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={Colors.light.tint}
+            />
+          }
         >
           {Object.keys(groupedAssets).length === 0 ? (
             <View style={{ 
@@ -340,7 +366,7 @@ export default function BeniScreen() {
               justifyContent: 'center',
               paddingVertical: 60
             }}>
-              <Ionicons name="cube-outline" size={60} color={Colors.light.textSecondary} />
+              <MaterialCommunityIcons name="package-variant-closed" size={60} color={Colors.light.textSecondary} />
               <Text style={{ 
                 fontSize: 18, 
                 fontWeight: '600',
@@ -377,7 +403,7 @@ export default function BeniScreen() {
         visible={showAddModal}
         onClose={() => setShowAddModal(false)}
         onSubmit={async (asset) => {
-          await load();
+          await load(true); // Forza refresh dopo creazione
         }}
       />
 
@@ -396,7 +422,7 @@ export default function BeniScreen() {
               try {
                 const newStatus = selectedDeadline.status === 'done' ? 'pending' : 'done';
                 await updateDeadlineStatus(selectedDeadline.id, newStatus);
-                await load();
+                await load(true); // Forza refresh dopo modifica
               } catch (e: any) {
                 Alert.alert('Errore', e.message);
               }
@@ -408,7 +434,7 @@ export default function BeniScreen() {
             if (selectedDeadline) {
               try {
                 await deleteDeadline(selectedDeadline.id);
-                await load();
+                await load(true); // Forza refresh dopo eliminazione
               } catch (e: any) {
                 Alert.alert('Errore', e.message);
               }
@@ -417,7 +443,7 @@ export default function BeniScreen() {
             setSelectedDeadline(null);
           }}
           onEdit={async () => {
-            await load();
+            await load(true); // Forza refresh dopo modifica
             setShowDeadlineDetail(false);
             setSelectedDeadline(null);
           }}

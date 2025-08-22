@@ -100,6 +100,38 @@ export default function RootLayout() {
               animation: 'slide_from_right'
             }} 
           />
+          <Stack.Screen 
+            name="profile-edit" 
+            options={{ 
+              headerShown: false,
+              presentation: 'card',
+              animation: 'slide_from_right'
+            }} 
+          />
+          <Stack.Screen 
+            name="notifications-settings" 
+            options={{ 
+              headerShown: false,
+              presentation: 'card',
+              animation: 'slide_from_right'
+            }} 
+          />
+          <Stack.Screen 
+            name="deadline-detail" 
+            options={{ 
+              headerShown: false,
+              presentation: 'card',
+              animation: 'slide_from_right'
+            }} 
+          />
+          <Stack.Screen 
+            name="document-detail" 
+            options={{ 
+              headerShown: false,
+              presentation: 'card',
+              animation: 'slide_from_right'
+            }} 
+          />
           <Stack.Screen name="+not-found" />
         </Stack>
         <StatusBar style="dark" backgroundColor={Colors.light.background} />

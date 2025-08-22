@@ -16,8 +16,10 @@ export type Deadline = {
   status: 'pending' | 'done' | 'skipped';
   recurrence_rrule: string | null;
   notes: string | null;
-  asset_id: string | null;
-  asset?: { name: string; type?: string; custom_icon?: string | null } | null;
+  asset_id: string | null; // Mantenuto per retrocompatibilità
+  asset?: { name: string; type?: string; custom_icon?: string | null } | null; // Mantenuto per retrocompatibilità
+  assets?: Asset[] | null; // Nuovo: array di beni associati
+  documents?: Document[] | null; // Nuovo: array di documenti associati
   completed_at: string | null;
   base_due_at: string | null;
   created_at: string;

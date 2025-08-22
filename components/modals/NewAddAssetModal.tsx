@@ -1,9 +1,9 @@
 import { Colors } from '@/constants/Colors';
 import { createAsset } from '@/lib/api';
 import { ASSET_TEMPLATES, type AssetCategory, getTemplatesForCategory } from '@/lib/assetTemplates';
-import { Ionicons } from '@expo/vector-icons';
-import React, { useState } from 'react';
-import { Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import React, { useRef, useState } from 'react';
+import { Alert, Animated, Dimensions, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface NewAddAssetModalProps {
@@ -12,6 +12,8 @@ interface NewAddAssetModalProps {
   onSubmit: (asset: any) => void;
 }
 
+const { width: screenWidth } = Dimensions.get('window');
+
 export function NewAddAssetModal({ visible, onClose, onSubmit }: NewAddAssetModalProps) {
   const [step, setStep] = useState<'category' | 'template' | 'details'>('category');
   const [selectedCategory, setSelectedCategory] = useState<AssetCategory | null>(null);
@@ -19,6 +21,9 @@ export function NewAddAssetModal({ visible, onClose, onSubmit }: NewAddAssetModa
   const [name, setName] = useState('');
   const [identifier, setIdentifier] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Animation values
+  const slideAnim = useRef(new Animated.Value(0)).current;
 
   function reset() {
     setStep('category');
@@ -27,11 +32,21 @@ export function NewAddAssetModal({ visible, onClose, onSubmit }: NewAddAssetModa
     setName('');
     setIdentifier('');
     setIsLoading(false);
+    slideAnim.setValue(0);
+  }
+
+  function animateToStep(stepIndex: number) {
+    Animated.timing(slideAnim, {
+      toValue: -stepIndex * screenWidth,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
   }
 
   function handleCategorySelect(category: AssetCategory) {
     setSelectedCategory(category);
     setStep('template');
+    animateToStep(1);
   }
 
   function handleTemplateSelect(templateKey: string) {
@@ -49,6 +64,7 @@ export function NewAddAssetModal({ visible, onClose, onSubmit }: NewAddAssetModa
     }
     
     setStep('details');
+    animateToStep(2);
   }
 
   async function handleSubmit() {
@@ -165,158 +181,169 @@ export function NewAddAssetModal({ visible, onClose, onSubmit }: NewAddAssetModa
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
       <SafeAreaView style={{ flex: 1, backgroundColor: Colors.light.background }}>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
-          <View style={{ flex: 1, padding: 16 }}>
-            {/* Header */}
-            <View style={{ 
-              flexDirection: 'row', 
-              alignItems: 'center', 
-              justifyContent: 'space-between',
-              paddingTop: 16,
-              paddingBottom: 8
-            }}>
-              <Text style={{ 
-                fontSize: 32, 
-                fontWeight: '800',
-                color: Colors.light.text
-              }}>
-                {step === 'category' && 'Aggiungi bene'}
-                {step === 'template' && 'Scegli tipo'}
-                {step === 'details' && 'Dettagli bene'}
-              </Text>
-              <Pressable 
-                onPress={handleClose}
-                style={{
-                  backgroundColor: Colors.light.tint,
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  alignItems: 'center',
-                  justifyContent: 'center'
-                }}
-              >
-                <Ionicons name="close" size={20} color="#fff" />
-              </Pressable>
-            </View>
+        {/* Fixed Header */}
+        <View style={{ 
+          flexDirection: 'row', 
+          alignItems: 'center', 
+          justifyContent: 'space-between',
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 8,
+          backgroundColor: Colors.light.background,
+          zIndex: 1
+        }}>
+          <Text style={{ 
+            fontSize: 32, 
+            fontWeight: '800',
+            color: Colors.light.text
+          }}>
+            {step === 'category' && 'Aggiungi bene'}
+            {step === 'template' && 'Scegli tipo'}
+            {step === 'details' && 'Dettagli bene'}
+          </Text>
+          <Pressable 
+            onPress={handleClose}
+            style={{
+              backgroundColor: Colors.light.tint,
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            <MaterialCommunityIcons name="close" size={20} color="#fff" />
+          </Pressable>
+        </View>
 
-            {/* Navigation breadcrumb for non-category steps */}
-            {step !== 'category' && (
-              <View style={{ 
-                flexDirection: 'row', 
+        {/* Navigation breadcrumb for non-category steps */}
+        {step !== 'category' && (
+          <View style={{ 
+            flexDirection: 'row', 
+            alignItems: 'center',
+            paddingHorizontal: 16,
+            marginBottom: 16,
+            gap: 8,
+            backgroundColor: Colors.light.background,
+            zIndex: 1
+          }}>
+            <Pressable
+              onPress={() => {
+                if (step === 'template') {
+                  setStep('category');
+                  setSelectedCategory(null);
+                  animateToStep(0);
+                } else if (step === 'details') {
+                  setStep('template');
+                  setSelectedTemplate(null);
+                  setName('');
+                  setIdentifier('');
+                  animateToStep(1);
+                }
+              }}
+              style={{ 
+                flexDirection: 'row',
                 alignItems: 'center',
-                marginBottom: 16,
-                gap: 8
+                paddingVertical: 8,
+                paddingHorizontal: 8,
+                paddingRight: 12,
+                backgroundColor: 'rgba(0, 122, 255, 0.1)',
+                borderRadius: 8,
+                gap: 4
+              }}
+            >
+              <MaterialCommunityIcons name="chevron-left" size={16} color={Colors.light.tint} />
+              <Text style={{ 
+                fontSize: 16, 
+                color: Colors.light.tint,
+                fontWeight: '600'
               }}>
-                <Pressable
-                  onPress={() => {
-                    if (step === 'template') {
-                      setStep('category');
-                      setSelectedCategory(null);
-                    } else if (step === 'details') {
-                      setStep('template');
-                      setSelectedTemplate(null);
-                      setName('');
-                      setIdentifier('');
-                    }
-                  }}
-                  style={{ 
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    paddingVertical: 8,
-                    paddingRight: 8,
-                    gap: 4
-                  }}
-                >
-                  <Ionicons name="chevron-back" size={16} color={Colors.light.tint} />
-                  <Text style={{ 
-                    fontSize: 16, 
-                    color: Colors.light.tint,
-                    fontWeight: '600'
-                  }}>
-                    {step === 'template' ? 'Categorie' : 'Tipi di bene'}
-                  </Text>
-                </Pressable>
-              </View>
-            )}
+                {step === 'template' ? 'Categorie' : 'Tipi di bene'}
+              </Text>
+            </Pressable>
+          </View>
+        )}
 
-            {/* Step 1: Category Selection */}
-            {step === 'category' && (
-              <View style={{ flex: 1 }}>
-                <View style={{
-                  backgroundColor: Colors.light.cardBackground,
-                  borderRadius: 16,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 1,
-                  elevation: 1,
-                  marginBottom: 24
-                }}>
-                  {Object.entries(ASSET_TEMPLATES).map(([key, category], index) => {
-                    const isLast = index === Object.entries(ASSET_TEMPLATES).length - 1;
-                    return (
-                      <View key={key}>
-                        <Pressable
-                          onPress={() => handleCategorySelect(key as AssetCategory)}
-                          style={{
-                            flexDirection: 'row',
-                            alignItems: 'center',
-                            paddingVertical: 16,
-                            paddingHorizontal: 16,
-                            justifyContent: 'space-between'
-                          }}
-                        >
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-                            <View style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: 10,
-                              backgroundColor: Colors.light.tint,
-                              alignItems: 'center',
-                              justifyContent: 'center'
-                            }}>
-                              <Ionicons 
-                                name={category.icon as any} 
-                                size={20} 
-                                color="#fff" 
-                              />
-                            </View>
-                            <Text style={{
-                              fontSize: 16,
-                              fontWeight: '600',
-                              color: Colors.light.text
-                            }}>
-                              {category.label}
-                            </Text>
-                          </View>
-                          <Ionicons name="chevron-forward" size={16} color={Colors.light.textSecondary} />
-                        </Pressable>
-                        {!isLast && (
+        {/* Animated Content Container */}
+        <View style={{ flex: 1, overflow: 'hidden' }}>
+          <Animated.View style={{
+            flexDirection: 'row',
+            width: screenWidth * 3,
+            flex: 1,
+            transform: [{ translateX: slideAnim }]
+          }}>
+            {/* Panel 1: Category Selection */}
+            <ScrollView 
+              style={{ width: screenWidth, flex: 1 }} 
+              contentContainerStyle={{ flexGrow: 1, padding: 16 }}
+            >
+              <View style={{
+                backgroundColor: Colors.light.cardBackground,
+                borderRadius: 16,
+                marginBottom: 24
+              }}>
+                {Object.entries(ASSET_TEMPLATES).map(([key, category], index) => {
+                  const isLast = index === Object.entries(ASSET_TEMPLATES).length - 1;
+                  return (
+                    <View key={key}>
+                      <Pressable
+                        onPress={() => handleCategorySelect(key as AssetCategory)}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingVertical: 12,
+                          paddingHorizontal: 16,
+                          justifyContent: 'space-between',
+                          minHeight: 44
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                           <View style={{
-                            height: 0.5,
-                            backgroundColor: Colors.light.border,
-                            marginLeft: 0,
-                            marginRight: 0
-                          }} />
-                        )}
-                      </View>
-                    );
-                  })}
-                </View>
+                            width: 29,
+                            height: 29,
+                            borderRadius: 6,
+                            backgroundColor: Colors.light.tint,
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                          }}>
+                            <MaterialCommunityIcons 
+                              name={category.icon as any} 
+                              size={18} 
+                              color="#fff" 
+                            />
+                          </View>
+                          <Text style={{
+                            fontSize: 17,
+                            fontWeight: '400',
+                            color: Colors.light.text
+                          }}>
+                            {category.label}
+                          </Text>
+                        </View>
+                        <MaterialCommunityIcons name="chevron-right" size={14} color={Colors.light.textSecondary} />
+                      </Pressable>
+                      {!isLast && (
+                        <View style={{
+                          height: 0.33,
+                          backgroundColor: Colors.light.border,
+                          marginLeft: 57
+                        }} />
+                      )}
+                    </View>
+                  );
+                })}
               </View>
-            )}
+            </ScrollView>
 
-            {/* Step 2: Template Selection */}
-            {step === 'template' && selectedCategory && (
-              <View style={{ flex: 1 }}>
+            {/* Panel 2: Template Selection */}
+            <ScrollView 
+              style={{ width: screenWidth, flex: 1 }} 
+              contentContainerStyle={{ flexGrow: 1, padding: 16 }}
+            >
+              {selectedCategory && (
                 <View style={{
                   backgroundColor: Colors.light.cardBackground,
                   borderRadius: 16,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 1,
-                  elevation: 1,
                   marginBottom: 24
                 }}>
                   {getTemplatesForCategory(selectedCategory)?.items?.map((template, index) => {
@@ -329,45 +356,46 @@ export function NewAddAssetModal({ visible, onClose, onSubmit }: NewAddAssetModa
                           style={{
                             flexDirection: 'row',
                             alignItems: 'center',
-                            paddingVertical: 16,
+                            paddingVertical: template.key === 'custom' ? 10 : 12,
                             paddingHorizontal: 16,
-                            justifyContent: 'space-between'
+                            justifyContent: 'space-between',
+                            minHeight: template.key === 'custom' ? 50 : 44
                           }}
                         >
                           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
                             <View style={{
-                              width: 40,
-                              height: 40,
-                              borderRadius: 10,
+                              width: 29,
+                              height: 29,
+                              borderRadius: 6,
                               backgroundColor: Colors.light.tint,
                               alignItems: 'center',
                               justifyContent: 'center'
                             }}>
-                              <Ionicons 
+                              <MaterialCommunityIcons 
                                 name={template.icon as any} 
-                                size={20} 
+                                size={18} 
                                 color="#fff" 
                               />
                             </View>
                             <View style={{ flex: 1 }}>
                               <Text style={{
-                                fontSize: 16,
-                                fontWeight: '600',
+                                fontSize: 17,
+                                fontWeight: '400',
                                 color: Colors.light.text,
-                                marginBottom: template.key === 'custom' ? 4 : 0
+                                marginBottom: template.key === 'custom' ? 3 : 0
                               }}>
                                 {template.name}
                               </Text>
                               {template.key === 'custom' && (
                                 <View style={{
                                   backgroundColor: Colors.light.warning + '15',
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 3,
-                                  borderRadius: 12,
+                                  paddingHorizontal: 6,
+                                  paddingVertical: 2,
+                                  borderRadius: 8,
                                   alignSelf: 'flex-start'
                                 }}>
                                   <Text style={{
-                                    fontSize: 11,
+                                    fontSize: 10,
                                     fontWeight: '600',
                                     color: Colors.light.warning
                                   }}>
@@ -377,127 +405,118 @@ export function NewAddAssetModal({ visible, onClose, onSubmit }: NewAddAssetModa
                               )}
                             </View>
                           </View>
-                          <Ionicons name="chevron-forward" size={16} color={Colors.light.textSecondary} />
+                          <MaterialCommunityIcons name="chevron-right" size={14} color={Colors.light.textSecondary} />
                         </Pressable>
                         {!isLast && (
                           <View style={{
-                            height: 0.5,
+                            height: 0.33,
                             backgroundColor: Colors.light.border,
-                            marginLeft: 0,
-                            marginRight: 0
+                            marginLeft: 57
                           }} />
                         )}
                       </View>
                     );
                   })}
                 </View>
-              </View>
-            )}
+              )}
+            </ScrollView>
 
-            {/* Step 3: Details */}
-            {step === 'details' && selectedCategory && selectedTemplate && (
-              <View style={{ flex: 1 }}>
-                <View style={{ gap: 16, flex: 1 }}>
-                  {/* Nome */}
-                  <View>
-                    <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8, color: '#333' }}>
-                      Nome bene
-                    </Text>
-                    <TextInput
-                      value={name}
-                      onChangeText={setName}
-                      placeholder={selectedTemplate === 'custom' ? 'Inserisci nome del bene' : 'Modifica nome se necessario'}
-                      style={{
-                        backgroundColor: '#fff',
-                        borderRadius: 12,
-                        padding: 16,
-                        fontSize: 16,
-                        borderWidth: 1,
-                        borderColor: '#e1e1e6',
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.05,
-                        shadowRadius: 2,
-                        elevation: 1
-                      }}
-                    />
-                  </View>
-
-                  {/* Identificativo */}
-                  <View>
-                    <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8, color: '#333' }}>
-                      Identificativo
-                    </Text>
-                    <Text style={{ fontSize: 14, color: '#666', marginBottom: 8 }}>
-                      {getIdentifierPlaceholder()} (opzionale)
-                    </Text>
-                    <TextInput
-                      value={identifier}
-                      onChangeText={setIdentifier}
-                      placeholder={getIdentifierPlaceholder()}
-                      style={{
-                        backgroundColor: '#fff',
-                        borderRadius: 12,
-                        padding: 16,
-                        fontSize: 16,
-                        borderWidth: 1,
-                        borderColor: '#e1e1e6',
-                        shadowColor: '#000',
-                        shadowOffset: { width: 0, height: 1 },
-                        shadowOpacity: 0.05,
-                        shadowRadius: 2,
-                        elevation: 1
-                      }}
-                    />
-                  </View>
-                </View>
-
-                {/* Submit Button */}
-                <View style={{ flexDirection: 'row', gap: 12, paddingTop: 24 }}>
-                  <Pressable 
-                    onPress={() => {
-                      setStep('template');
-                      setSelectedTemplate(null);
-                      setName('');
-                      setIdentifier('');
-                    }}
-                    disabled={isLoading}
-                    style={{ 
-                      flex: 1, 
-                      padding: 16, 
-                      borderRadius: 12, 
-                      backgroundColor: isLoading ? '#f8f8f8' : '#f2f2f7', 
-                      alignItems: 'center',
-                      opacity: isLoading ? 0.5 : 1
-                    }}
-                  >
-                    <Text style={{ fontWeight: '600', color: isLoading ? '#999' : '#000' }}>Indietro</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={handleSubmit}
-                    disabled={isLoading || !name.trim()}
+            {/* Panel 3: Details */}
+            <ScrollView 
+              style={{ width: screenWidth, flex: 1 }} 
+              contentContainerStyle={{ flexGrow: 1, padding: 16 }}
+            >
+              <View style={{ gap: 16, flex: 1 }}>
+                {/* Nome */}
+                <View>
+                  <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8, color: '#333' }}>
+                    Nome bene
+                  </Text>
+                  <TextInput
+                    value={name}
+                    onChangeText={setName}
+                    placeholder={selectedTemplate === 'custom' ? 'Inserisci nome del bene' : 'Modifica nome se necessario'}
                     style={{
-                      flex: 1,
-                      padding: 16,
+                      backgroundColor: '#fff',
                       borderRadius: 12,
-                      backgroundColor: isLoading || !name.trim() ? '#80a8ff' : '#0a84ff',
-                      alignItems: 'center',
-                      opacity: isLoading || !name.trim() ? 0.8 : 1
-                    }}
-                  >
-                    <Text style={{
-                      color: '#fff',
+                      padding: 16,
                       fontSize: 16,
-                      fontWeight: '600'
-                    }}>
-                      {isLoading ? 'Creazione...' : 'Crea bene'}
-                    </Text>
-                  </Pressable>
+                      borderWidth: 1,
+                      borderColor: '#e1e1e6'
+                    }}
+                  />
+                </View>
+
+                {/* Identificativo */}
+                <View>
+                  <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8, color: '#333' }}>
+                    Identificativo
+                  </Text>
+                  <Text style={{ fontSize: 14, color: '#666', marginBottom: 8 }}>
+                    {getIdentifierPlaceholder()} (opzionale)
+                  </Text>
+                  <TextInput
+                    value={identifier}
+                    onChangeText={setIdentifier}
+                    placeholder={getIdentifierPlaceholder()}
+                    style={{
+                      backgroundColor: '#fff',
+                      borderRadius: 12,
+                      padding: 16,
+                      fontSize: 16,
+                      borderWidth: 1,
+                      borderColor: '#e1e1e6'
+                    }}
+                  />
                 </View>
               </View>
-            )}
-          </View>
-        </ScrollView>
+
+              {/* Submit Button */}
+              <View style={{ flexDirection: 'row', gap: 12, paddingTop: 24 }}>
+                <Pressable 
+                  onPress={() => {
+                    setStep('template');
+                    setSelectedTemplate(null);
+                    setName('');
+                    setIdentifier('');
+                    animateToStep(1);
+                  }}
+                  disabled={isLoading}
+                  style={{ 
+                    flex: 1, 
+                    padding: 16, 
+                    borderRadius: 12, 
+                    backgroundColor: isLoading ? '#f8f8f8' : '#f2f2f7', 
+                    alignItems: 'center',
+                    opacity: isLoading ? 0.5 : 1
+                  }}
+                >
+                  <Text style={{ fontWeight: '600', color: isLoading ? '#999' : '#000' }}>Indietro</Text>
+                </Pressable>
+                <Pressable
+                  onPress={handleSubmit}
+                  disabled={isLoading || !name.trim()}
+                  style={{
+                    flex: 1,
+                    padding: 16,
+                    borderRadius: 12,
+                    backgroundColor: isLoading || !name.trim() ? '#80a8ff' : '#0a84ff',
+                    alignItems: 'center',
+                    opacity: isLoading || !name.trim() ? 0.8 : 1
+                  }}
+                >
+                  <Text style={{
+                    color: '#fff',
+                    fontSize: 16,
+                    fontWeight: '600'
+                  }}>
+                    {isLoading ? 'Creazione...' : 'Crea bene'}
+                  </Text>
+                </Pressable>
+              </View>
+            </ScrollView>
+          </Animated.View>
+        </View>
       </SafeAreaView>
     </Modal>
   );

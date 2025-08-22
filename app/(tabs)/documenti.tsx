@@ -1,22 +1,24 @@
 import { AddDocumentModal, AddDocumentModalRef } from '@/components/modals/AddDocumentModal';
 import { AssetDetailModal } from '@/components/modals/AssetDetailModal';
 import { DeadlineDetailModal } from '@/components/modals/DeadlineDetailModal';
-import { DocumentDetailModal } from '@/components/modals/DocumentDetailModal';
 import { Colors } from '@/constants/Colors';
 import { createDocumentWithAssociations, getDocuments } from '@/lib/api';
 import { getAssetIcon } from '@/lib/assetIcons';
 import { Document } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 
 export default function Documenti() {
+  const router = useRouter();
   const [items, setItems] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastLoadTime, setLastLoadTime] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDocument, setShowDocument] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
   const [selectedDeadline, setSelectedDeadline] = useState<any>(null);
   const [showAssetDetail, setShowAssetDetail] = useState(false);
@@ -24,11 +26,17 @@ export default function Documenti() {
   
   const addDocumentModalRef = useRef<AddDocumentModalRef>(null);
 
-  async function load() {
+  async function load(forceRefresh = false) {
     try {
+      // Se non è un refresh forzato e abbiamo dati recenti (meno di 30 secondi), non ricaricare
+      if (!forceRefresh && lastLoadTime && (Date.now() - lastLoadTime) < 30000 && items.length > 0) {
+        return;
+      }
+      
       setLoading(true);
       const data = await getDocuments();
       setItems(data);
+      setLastLoadTime(Date.now());
     } catch (e: any) {
       Alert.alert('Errore', e.message);
     } finally {
@@ -36,7 +44,18 @@ export default function Documenti() {
     }
   }
 
-  useFocusEffect(useCallback(() => { load(); }, []));
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load(true);
+    setRefreshing(false);
+  };
+
+  // Carica solo al primo focus, non ad ogni cambio tab
+  useFocusEffect(useCallback(() => { 
+    if (items.length === 0) {
+      load();
+    }
+  }, [items.length]));
 
   const filteredItems = items.filter(item => {
     const searchLower = searchQuery.toLowerCase();
@@ -59,7 +78,7 @@ export default function Documenti() {
 
   const renderDocument = ({ item }: { item: Document }) => (
     <Pressable
-      onPress={() => setSelectedDocument(item)}
+      onPress={() => router.push(`/document-detail?id=${item.id}`)}
       style={{
         flexDirection: 'row',
         alignItems: 'center',
@@ -211,40 +230,46 @@ export default function Documenti() {
         {/* Search */}
         <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
           <View style={{
-            backgroundColor: Colors.light.cardBackground,
-            borderRadius: 12,
+            backgroundColor: '#e5e5ea',
+            borderRadius: 10,
             paddingHorizontal: 12,
-            paddingVertical: 10,
+            paddingVertical: 8,
             flexDirection: 'row',
-            alignItems: 'center',
-            borderColor: Colors.light.border,
-            borderWidth: 0.5
+            alignItems: 'center'
           }}>
-            <Ionicons name="search" size={20} color={Colors.light.textSecondary} style={{ marginRight: 8 }} />
+            <Ionicons name="search" size={17} color="#8e8e93" style={{ marginRight: 8 }} />
             <TextInput
               value={searchQuery}
               onChangeText={setSearchQuery}
               style={{ 
                 flex: 1, 
-                fontSize: 16,
-                color: Colors.light.text
+                fontSize: 17,
+                color: Colors.light.text,
+                paddingVertical: 4
               }}
-              placeholder="Cerca documenti, tag..."
-              placeholderTextColor={Colors.light.textSecondary}
+              placeholder="Cerca"
+              placeholderTextColor="#8e8e93"
             />
             {searchQuery.length > 0 && (
               <Pressable onPress={() => setSearchQuery('')}>
-                <Ionicons name="close-circle" size={20} color={Colors.light.textSecondary} />
-            </Pressable>
+                <Ionicons name="close-circle" size={17} color="#8e8e93" />
+              </Pressable>
             )}
           </View>
-          </View>
+        </View>
 
         {/* Documents List */}
         <ScrollView
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 16 }}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={Colors.light.tint}
+            />
+          }
         >
           {sortedDocuments.length === 0 ? (
             <View style={{ 
@@ -292,7 +317,7 @@ export default function Documenti() {
                     {renderDocument({ item: document })}
                     {!isLast && (
                       <View style={{
-                        height: 0.5,
+                        height: 0.33,
                         backgroundColor: Colors.light.border,
                         marginLeft: 0,
                         marginRight: 0
@@ -314,7 +339,7 @@ export default function Documenti() {
               try { 
             console.log('Creating document with data:', result);
             await createDocumentWithAssociations(result as any);
-            await load();
+            await load(true); // Forza refresh dopo creazione
             Alert.alert('Successo', 'Documento creato con successo');
                 setShowDocument(false); 
           } catch (error: any) {
@@ -327,38 +352,7 @@ export default function Documenti() {
             }} 
           />
 
-      {selectedDocument && (
-          <DocumentDetailModal
-            visible={!!selectedDocument}
-            onClose={() => setSelectedDocument(null)}
-            document={selectedDocument}
-          onUpdate={async () => {
-            // Ricarica la lista dei documenti dopo la modifica
-            await load();
-          }}
-          onDelete={async () => {
-            // Ricarica la lista dei documenti dopo l'eliminazione
-            await load();
-            setSelectedDocument(null);
-          }}
-          onAssetPress={(asset) => {
-            // Chiudi prima il modal del documento, poi apri quello del bene
-            setSelectedDocument(null);
-            setTimeout(() => {
-              setSelectedAsset(asset);
-              setShowAssetDetail(true);
-            }, 100);
-          }}
-          onDeadlinePress={(deadline) => {
-            // Chiudi prima il modal del documento, poi apri quello della scadenza
-            setSelectedDocument(null);
-            setTimeout(() => {
-              setSelectedDeadline(deadline);
-              setShowDeadlineDetail(true);
-            }, 100);
-          }}
-        />
-      )}
+
 
       {selectedAsset && (
         <AssetDetailModal
@@ -369,7 +363,7 @@ export default function Documenti() {
           }}
           asset={selectedAsset}
           onEdit={async () => {
-            await load();
+            await load(true); // Forza refresh dopo modifica
           }}
           onDelete={() => {
             setShowAssetDetail(false);
@@ -395,17 +389,17 @@ export default function Documenti() {
           }}
           deadline={selectedDeadline}
           onToggleStatus={async () => {
-            await load();
+            await load(true); // Forza refresh dopo modifica
             setShowDeadlineDetail(false);
             setSelectedDeadline(null);
           }}
           onDelete={async () => {
-            await load();
+            await load(true); // Forza refresh dopo eliminazione
             setShowDeadlineDetail(false);
             setSelectedDeadline(null);
           }}
           onEdit={async () => {
-            await load();
+            await load(true); // Forza refresh dopo modifica
             setShowDeadlineDetail(false);
             setSelectedDeadline(null);
           }}

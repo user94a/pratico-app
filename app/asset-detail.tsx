@@ -1,12 +1,11 @@
-import { IconPickerModal } from '@/components/IconPickerModal';
-import { DeadlineDetailModal } from '@/components/modals/DeadlineDetailModal';
+
 import { DocumentDetailModal } from '@/components/modals/DocumentDetailModal';
 import { Colors } from '@/constants/Colors';
 import { getAssetDeadlines, getAssetDocuments } from '@/lib/api';
 import { getAssetIcon } from '@/lib/assetIcons';
 import { supabase } from '@/lib/supabase';
 import { Asset, Deadline, Document } from '@/lib/types';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
@@ -37,12 +36,10 @@ export default function AssetDetailScreen() {
   // Edit state
   const [editName, setEditName] = useState('');
   const [editIdentifier, setEditIdentifier] = useState('');
-  const [editCustomIcon, setEditCustomIcon] = useState<string | null>(null);
-  const [showIconPicker, setShowIconPicker] = useState(false);
+
   
   // Modal states
-  const [selectedDeadline, setSelectedDeadline] = useState<Deadline | null>(null);
-  const [showDeadlineDetail, setShowDeadlineDetail] = useState(false);
+
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [showDocumentDetail, setShowDocumentDetail] = useState(false);
 
@@ -67,7 +64,7 @@ export default function AssetDetailScreen() {
       setAsset(data);
       setEditName(data.name);
       setEditIdentifier(data.identifier || '');
-      setEditCustomIcon(data.custom_icon);
+
     } catch (error) {
       console.error('Error loading asset:', error);
       Alert.alert('Errore', 'Impossibile caricare i dettagli del bene');
@@ -108,7 +105,6 @@ export default function AssetDetailScreen() {
         .update({
           name: editName.trim(),
           identifier: editIdentifier.trim() || null,
-          custom_icon: editCustomIcon,
           updated_at: new Date().toISOString()
         })
         .eq('id', asset.id);
@@ -120,7 +116,6 @@ export default function AssetDetailScreen() {
         ...asset,
         name: editName.trim(),
         identifier: editIdentifier.trim() || null,
-        custom_icon: editCustomIcon,
         updated_at: new Date().toISOString()
       });
       
@@ -167,19 +162,13 @@ export default function AssetDetailScreen() {
     }
   };
 
-  const handleIconSelect = (iconKey: string) => {
-    setEditCustomIcon(iconKey);
-    setShowIconPicker(false);
-  };
 
-  const resetIcon = () => {
-    setEditCustomIcon(null);
-  };
+
+
 
   // Navigation handlers
   const handleDeadlinePress = (deadline: Deadline) => {
-    setSelectedDeadline(deadline);
-    setShowDeadlineDetail(true);
+    router.push({ pathname: '/deadline-detail', params: { id: deadline.id } });
   };
 
   const handleDocumentPress = (document: Document) => {
@@ -282,7 +271,7 @@ export default function AssetDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.light.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.light.cardBackground }}>
       {/* Header */}
       <View style={{
         flexDirection: 'row',
@@ -290,22 +279,35 @@ export default function AssetDetailScreen() {
         justifyContent: 'space-between',
         paddingHorizontal: 16,
         paddingVertical: 12,
-        borderBottomWidth: 0.5,
-        borderBottomColor: Colors.light.border
+        borderBottomWidth: 0.33,
+        borderBottomColor: Colors.light.border,
+        backgroundColor: Colors.light.cardBackground
       }}>
         <Pressable
           onPress={() => router.back()}
           style={{
-            flexDirection: 'row',
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            backgroundColor: '#F2F2F7',
             alignItems: 'center',
-            gap: 8
+            justifyContent: 'center'
           }}
         >
-          <Ionicons name="chevron-back" size={24} color={Colors.light.tint} />
-          <Text style={{ fontSize: 16, color: Colors.light.tint, fontWeight: '600' }}>
-            Beni
-          </Text>
+          <MaterialCommunityIcons name="chevron-left" size={18} color={Colors.light.text} />
         </Pressable>
+        
+        <Text style={{
+          fontSize: 17,
+          fontWeight: '600',
+          color: Colors.light.text,
+          textAlign: 'center',
+          position: 'absolute',
+          left: 0,
+          right: 0
+        }}>
+          Dettaglio Bene
+        </Text>
 
         {isEditing ? (
           <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -314,7 +316,7 @@ export default function AssetDetailScreen() {
                 setIsEditing(false);
                 setEditName(asset.name);
                 setEditIdentifier(asset.identifier || '');
-                setEditCustomIcon(asset.custom_icon);
+
               }}
               disabled={isSaving}
               style={{ opacity: isSaving ? 0.5 : 1 }}
@@ -346,7 +348,10 @@ export default function AssetDetailScreen() {
         )}
       </View>
 
-      <ScrollView style={{ flex: 1 }}>
+      <ScrollView 
+        style={{ flex: 1, backgroundColor: Colors.light.background }} 
+        showsVerticalScrollIndicator={false}
+      >
         <View style={{ padding: 16 }}>
           {/* Asset Info Card */}
           <View style={{
@@ -370,7 +375,7 @@ export default function AssetDetailScreen() {
                 justifyContent: 'center',
                 marginBottom: 16
               }}>
-                <Ionicons 
+                <MaterialCommunityIcons 
                   name={getAssetIcon(asset) as any} 
                   size={40} 
                   color="#fff" 
@@ -383,72 +388,63 @@ export default function AssetDetailScreen() {
                     <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8, color: '#333' }}>
                       Nome bene
                     </Text>
-                    <TextInput
-                      value={editName}
-                      onChangeText={setEditName}
-                      style={{
-                        backgroundColor: '#fff',
-                        borderRadius: 12,
-                        padding: 16,
-                        fontSize: 16,
-                        borderWidth: 1,
-                        borderColor: '#e1e1e6',
-                        textAlign: 'center'
-                      }}
-                    />
+                    <View style={{
+                      backgroundColor: '#fff',
+                      borderRadius: 12,
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      borderWidth: 1,
+                      borderColor: '#d1d1d6',
+                      flexDirection: 'row',
+                      alignItems: 'center'
+                    }}>
+                      <TextInput
+                        value={editName}
+                        onChangeText={setEditName}
+                        placeholder="Nome"
+                        style={{
+                          flex: 1,
+                          fontSize: 17,
+                          fontWeight: '400',
+                          textAlign: 'center'
+                        }}
+                      />
+                      {editName.length > 0 && (
+                        <Pressable onPress={() => setEditName('')}>
+                          <MaterialCommunityIcons name="close-circle" size={20} color="#c7c7cc" />
+                        </Pressable>
+                      )}
+                    </View>
                   </View>
 
                   <View>
                     <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8, color: '#333' }}>
                       Identificativo
                     </Text>
-                    <TextInput
-                      value={editIdentifier}
-                      onChangeText={setEditIdentifier}
-                      placeholder="Opzionale"
-                      style={{
-                        backgroundColor: '#fff',
-                        borderRadius: 12,
-                        padding: 16,
-                        fontSize: 16,
-                        borderWidth: 1,
-                        borderColor: '#e1e1e6',
-                        textAlign: 'center'
-                      }}
-                    />
-                  </View>
-
-                  <View>
-                    <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8, color: '#333' }}>
-                      Icona
-                    </Text>
-                    <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', justifyContent: 'center' }}>
-                      <Pressable
-                        onPress={() => setShowIconPicker(true)}
+                    <View style={{
+                      backgroundColor: '#fff',
+                      borderRadius: 12,
+                      paddingHorizontal: 16,
+                      paddingVertical: 12,
+                      borderWidth: 1,
+                      borderColor: '#d1d1d6',
+                      flexDirection: 'row',
+                      alignItems: 'center'
+                    }}>
+                      <TextInput
+                        value={editIdentifier}
+                        onChangeText={setEditIdentifier}
+                        placeholder="Identificativo"
                         style={{
-                          backgroundColor: Colors.light.tint,
-                          paddingHorizontal: 16,
-                          paddingVertical: 8,
-                          borderRadius: 8
+                          flex: 1,
+                          fontSize: 17,
+                          fontWeight: '400',
+                          textAlign: 'center'
                         }}
-                      >
-                        <Text style={{ color: '#fff', fontWeight: '600' }}>
-                          Cambia icona
-                        </Text>
-                      </Pressable>
-                      {editCustomIcon && (
-                        <Pressable
-                          onPress={resetIcon}
-                          style={{
-                            backgroundColor: '#f2f2f7',
-                            paddingHorizontal: 16,
-                            paddingVertical: 8,
-                            borderRadius: 8
-                          }}
-                        >
-                          <Text style={{ color: '#666', fontWeight: '600' }}>
-                            Ripristina
-                          </Text>
+                      />
+                      {editIdentifier.length > 0 && (
+                        <Pressable onPress={() => setEditIdentifier('')}>
+                          <MaterialCommunityIcons name="close-circle" size={20} color="#c7c7cc" />
                         </Pressable>
                       )}
                     </View>
@@ -577,11 +573,11 @@ export default function AssetDetailScreen() {
                             )}
                           </View>
                         </View>
-                        <Ionicons name="chevron-forward" size={16} color={Colors.light.textSecondary} />
+                        <MaterialCommunityIcons name="chevron-right" size={16} color={Colors.light.textSecondary} />
                       </Pressable>
                       {!isLast && (
                         <View style={{
-                          height: 0.5,
+                          height: 0.33,
                           backgroundColor: Colors.light.border,
                           marginLeft: 16
                         }} />
@@ -695,13 +691,13 @@ export default function AssetDetailScreen() {
                           </Text>
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                          <Ionicons name="document" size={16} color={Colors.light.textSecondary} />
-                          <Ionicons name="chevron-forward" size={16} color={Colors.light.textSecondary} />
+                          <MaterialCommunityIcons name="file-document" size={16} color={Colors.light.textSecondary} />
+                          <MaterialCommunityIcons name="chevron-right" size={16} color={Colors.light.textSecondary} />
                         </View>
                       </Pressable>
                       {!isLast && (
                         <View style={{
-                          height: 0.5,
+                          height: 0.33,
                           backgroundColor: Colors.light.border,
                           marginLeft: 16
                         }} />
@@ -757,7 +753,7 @@ export default function AssetDetailScreen() {
                   opacity: isDeleting ? 0.5 : 1
                 }}
               >
-                <Ionicons name="trash" size={20} color="#ff3b30" />
+                <MaterialCommunityIcons name="delete" size={20} color="#ff3b30" />
                 <Text style={{
                   fontSize: 16,
                   fontWeight: '600',
@@ -771,29 +767,7 @@ export default function AssetDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* Icon Picker Modal */}
-      <IconPickerModal
-        visible={showIconPicker}
-        onClose={() => setShowIconPicker(false)}
-        onSelectIcon={handleIconSelect}
-        selectedIcon={editCustomIcon || getAssetIcon(asset)}
-      />
 
-      {/* Deadline Detail Modal */}
-      {selectedDeadline && (
-        <DeadlineDetailModal
-          visible={showDeadlineDetail}
-          deadline={selectedDeadline}
-          onClose={() => {
-            setShowDeadlineDetail(false);
-            setSelectedDeadline(null);
-          }}
-          onEdit={handleDeadlineUpdate}
-          onAssetPress={(assetData) => {
-            // Questo bene è già quello che stiamo visualizzando, non serve fare nulla
-          }}
-        />
-      )}
 
       {/* Document Detail Modal */}
       {selectedDocument && (
@@ -809,12 +783,11 @@ export default function AssetDetailScreen() {
             // Questo bene è già quello che stiamo visualizzando, non serve fare nulla
           }}
           onDeadlinePress={(deadline) => {
-            // Chiudi il modal del documento e apri quello della scadenza
+            // Chiudi il modal del documento e naviga alla pagina della scadenza
             setShowDocumentDetail(false);
             setSelectedDocument(null);
             setTimeout(() => {
-              setSelectedDeadline(deadline);
-              setShowDeadlineDetail(true);
+              router.push({ pathname: '/deadline-detail', params: { id: deadline.id } });
             }, 100);
           }}
         />

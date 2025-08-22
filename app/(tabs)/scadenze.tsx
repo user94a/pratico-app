@@ -1,13 +1,13 @@
 import { AddDeadlineModal } from '@/components/modals/AddDeadlineModal';
 import { AssetDetailModal } from '@/components/modals/AssetDetailModal';
-import { DeadlineDetailModal } from '@/components/modals/DeadlineDetailModal';
 import { Colors } from '@/constants/Colors';
-import { createDeadlineWithAssociations, deleteDeadline, getAllDeadlines, updateDeadlineStatus } from '@/lib/api';
+import { createDeadlineWithAssociations, getAllDeadlines } from '@/lib/api';
 import { Deadline } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 
 function getDeadlineStatus(deadline: Deadline) {
   if (deadline.status === 'done') return null;
@@ -95,19 +95,28 @@ function getRecurrenceText(rrule: string): string {
 }
 
 export default function Scadenze() {
+  const router = useRouter();
   const [items, setItems] = useState<Deadline[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastLoadTime, setLastLoadTime] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [showDeadline, setShowDeadline] = useState(false);
-  const [selectedDeadline, setSelectedDeadline] = useState<Deadline | null>(null);
+
   const [selectedAsset, setSelectedAsset] = useState<any>(null);
   const [showAssetDetail, setShowAssetDetail] = useState(false);
 
-  async function load() {
+  async function load(forceRefresh = false) {
     try { 
+      // Se non è un refresh forzato e abbiamo dati recenti (meno di 30 secondi), non ricaricare
+      if (!forceRefresh && lastLoadTime && (Date.now() - lastLoadTime) < 30000 && items.length > 0) {
+        return;
+      }
+      
       setLoading(true);
       const data = await getAllDeadlines(); 
-      setItems(data); 
+      setItems(data);
+      setLastLoadTime(Date.now());
     } catch (e: any) {
       Alert.alert('Errore', e.message); 
     } finally { 
@@ -115,7 +124,18 @@ export default function Scadenze() {
     }
   }
 
-  useFocusEffect(useCallback(() => { load(); }, []));
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load(true);
+    setRefreshing(false);
+  };
+
+  // Carica solo al primo focus, non ad ogni cambio tab
+  useFocusEffect(useCallback(() => { 
+    if (items.length === 0) {
+      load();
+    }
+  }, [items.length]));
 
   // Ordina per prossimità alla scadenza (prima le scadute, poi quelle prossime)
   const sortedItems = [...items].sort((a, b) => {
@@ -270,7 +290,7 @@ export default function Scadenze() {
                 {renderDeadline({ item: deadline })}
                 {!isLast && (
                   <View style={{
-                    height: 0.5,
+                    height: 0.33,
                     backgroundColor: Colors.light.border,
                     marginLeft: 0,
                     marginRight: 0
@@ -293,7 +313,7 @@ export default function Scadenze() {
 
   return (
       <Pressable
-        onPress={() => setSelectedDeadline(item)}
+        onPress={() => router.push({ pathname: '/deadline-detail', params: { id: item.id } })}
         style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -445,33 +465,32 @@ export default function Scadenze() {
         {/* Search */}
         <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
           <View style={{
-            backgroundColor: Colors.light.cardBackground,
-            borderRadius: 12,
+            backgroundColor: '#e5e5ea',
+            borderRadius: 10,
             paddingHorizontal: 12,
-            paddingVertical: 10,
+            paddingVertical: 8,
             flexDirection: 'row',
-            alignItems: 'center',
-            borderColor: Colors.light.border,
-            borderWidth: 0.5
+            alignItems: 'center'
           }}>
-            <Ionicons name="search" size={20} color={Colors.light.textSecondary} style={{ marginRight: 8 }} />
+            <Ionicons name="search" size={17} color="#8e8e93" style={{ marginRight: 8 }} />
             <TextInput
               value={searchQuery}
               onChangeText={setSearchQuery}
               style={{ 
                 flex: 1, 
-                fontSize: 16,
-                color: Colors.light.text
+                fontSize: 17,
+                color: Colors.light.text,
+                paddingVertical: 4
               }}
-              placeholder="Cerca scadenze..."
-              placeholderTextColor={Colors.light.textSecondary}
+              placeholder="Cerca"
+              placeholderTextColor="#8e8e93"
             />
             {searchQuery.length > 0 && (
               <Pressable onPress={() => setSearchQuery('')}>
-                <Ionicons name="close-circle" size={20} color={Colors.light.textSecondary} />
+                <Ionicons name="close-circle" size={17} color="#8e8e93" />
               </Pressable>
-                  )}
-                </View>
+            )}
+          </View>
         </View>
 
         {/* Deadlines List */}
@@ -479,6 +498,13 @@ export default function Scadenze() {
           style={{ flex: 1 }}
           contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 16 }}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={Colors.light.tint}
+            />
+          }
         >
           {Object.keys(groupedDeadlines).length === 0 ? (
             <View style={{ 
@@ -531,56 +557,13 @@ export default function Scadenze() {
         onSubmit={async (result) => {
           try {
             await createDeadlineWithAssociations(result as any);
-            await load();
+            await load(true); // Forza refresh dopo creazione
             setShowDeadline(false);
           } catch (e: any) {
             Alert.alert('Errore', e.message || 'Impossibile creare la scadenza');
           }
         }}
       />
-
-      {selectedDeadline && (
-        <DeadlineDetailModal
-          visible={!!selectedDeadline}
-          onClose={() => setSelectedDeadline(null)}
-          deadline={selectedDeadline}
-          onToggleStatus={async () => {
-            if (selectedDeadline) {
-              try {
-                const newStatus = selectedDeadline.status === 'done' ? 'pending' : 'done';
-                await updateDeadlineStatus(selectedDeadline.id, newStatus);
-                await load();
-              } catch (e: any) {
-                Alert.alert('Errore', e.message); 
-              } 
-            }
-            setSelectedDeadline(null);
-          }}
-          onDelete={async () => {
-            if (selectedDeadline) {
-              try { 
-                await deleteDeadline(selectedDeadline.id);
-                await load();
-              } catch (e: any) {
-                Alert.alert('Errore', e.message); 
-              } 
-            }
-            setSelectedDeadline(null);
-          }}
-          onEdit={async () => {
-            await load();
-            setSelectedDeadline(null);
-          }}
-          onAssetPress={(asset) => {
-            // Chiudi prima il modal della scadenza, poi apri quello del bene
-            setSelectedDeadline(null);
-            setTimeout(() => {
-              setSelectedAsset(asset);
-              setShowAssetDetail(true);
-            }, 100);
-            }} 
-          />
-      )}
 
       {selectedAsset && (
         <AssetDetailModal
@@ -591,17 +574,17 @@ export default function Scadenze() {
             }} 
           asset={selectedAsset}
           onEdit={async () => {
-                await load(); 
+                await load(true); // Forza refresh dopo modifica
           }}
           onDelete={() => {
             setShowAssetDetail(false);
             setSelectedAsset(null);
           }}
           onDeadlinePress={(deadline) => {
-            // Chiudi prima il modal del bene, poi apri quello della scadenza
+            // Chiudi prima il modal del bene, poi naviga alla pagina della scadenza
             setShowAssetDetail(false);
             setTimeout(() => {
-              setSelectedDeadline(deadline);
+              router.push({ pathname: '/deadline-detail', params: { id: deadline.id } });
             }, 100);
             }} 
           />

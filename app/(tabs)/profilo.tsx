@@ -1,23 +1,28 @@
 import { Colors } from '@/constants/Colors';
 import { supabase } from '@/lib/supabase';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Alert, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native';
 
 export default function Impostazioni() {
   const router = useRouter();
   const [email, setEmail] = useState<string | null>(null);
   const [nome, setNome] = useState('');
   const [cognome, setCognome] = useState('');
-  const [originalNome, setOriginalNome] = useState('');
-  const [originalCognome, setOriginalCognome] = useState('');
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [saveLoading, setSaveLoading] = useState(false);
+
 
   useEffect(() => {
     loadUserData();
   }, []);
+
+  // Ricarica i dati quando la pagina torna in focus
+  useFocusEffect(
+    useCallback(() => {
+      loadUserData();
+    }, [])
+  );
 
   async function loadUserData() {
     try {
@@ -35,8 +40,6 @@ export default function Impostazioni() {
         if (profile) {
           setNome(profile.nome || '');
           setCognome(profile.cognome || '');
-          setOriginalNome(profile.nome || '');
-          setOriginalCognome(profile.cognome || '');
         }
       }
     } catch (error) {
@@ -44,42 +47,9 @@ export default function Impostazioni() {
     }
   }
 
-  async function handleSaveProfile() {
-    try {
-      setSaveLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) throw new Error('Utente non autenticato');
 
-      const { error } = await supabase
-        .from('user_profiles')
-        .upsert({
-          user_id: user.id,
-          nome: nome.trim(),
-          cognome: cognome.trim(),
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id'
-        });
 
-      if (error) throw error;
 
-      setOriginalNome(nome.trim());
-      setOriginalCognome(cognome.trim());
-      setIsEditingProfile(false);
-      Alert.alert('Successo', 'Profilo aggiornato');
-    } catch (error: any) {
-      Alert.alert('Errore', error.message);
-    } finally {
-      setSaveLoading(false);
-    }
-  }
-
-  function handleCancelEditProfile() {
-    setNome(originalNome);
-    setCognome(originalCognome);
-    setIsEditingProfile(false);
-  }
 
   async function handleLogout() {
     Alert.alert(
@@ -128,14 +98,8 @@ export default function Impostazioni() {
     );
   }
 
-  function navigateToNotificheScadenze() {
-    // TODO: Navigare alla pagina dettaglio notifiche scadenze
-    Alert.alert('Info', 'Pagina notifiche scadenze in sviluppo');
-  }
-
-  function navigateToPromemoria() {
-    // TODO: Navigare alla pagina dettaglio promemoria
-    Alert.alert('Info', 'Pagina promemoria in sviluppo');
+  function navigateToNotifications() {
+    router.push('/notifications-settings');
   }
 
   // Componente per le voci del menu
@@ -182,198 +146,58 @@ export default function Impostazioni() {
     isLast?: boolean;
   }) {
     return (
-      <Pressable
-        onPress={onPress}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          padding: 16,
-          borderBottomWidth: isLast ? 0 : 0.5,
-          borderBottomColor: Colors.light.border
-        }}
-      >
-        <View style={{
-          width: 32,
-          height: 32,
-          borderRadius: 8,
-          backgroundColor: Colors.light.tint,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginRight: 12
-        }}>
-          <Ionicons name={icon as any} size={18} color="#fff" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ 
-            fontSize: 16, 
-            fontWeight: '600',
-            color: Colors.light.text 
+      <View>
+        <Pressable
+          onPress={onPress}
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            paddingVertical: 12,
+            paddingHorizontal: 16,
+            minHeight: 44
+          }}
+        >
+          <View style={{
+            width: 29,
+            height: 29,
+            borderRadius: 6,
+            backgroundColor: Colors.light.tint,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 12
           }}>
-            {title}
-          </Text>
-          {subtitle && (
-            <Text style={{ 
-              fontSize: 14, 
-              color: Colors.light.textSecondary,
-              marginTop: 2
-            }}>
-              {subtitle}
-            </Text>
-          )}
-        </View>
-        {rightElement || (
-          <Ionicons name="chevron-forward" size={16} color={Colors.light.textSecondary} />
-        )}
-      </Pressable>
-    );
-  }
-
-  if (isEditingProfile) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.light.background }}>
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ flexGrow: 1 }}>
-          <View style={{ flex: 1, padding: 16 }}>
-            {/* Header */}
-            <View style={{ 
-              flexDirection: 'row', 
-              alignItems: 'center', 
-              justifyContent: 'space-between', 
-              marginBottom: 24
-            }}>
-              <Text style={{ 
-                fontSize: 32, 
-                fontWeight: '800',
-                color: Colors.light.text
-              }}>
-                Modifica Profilo
-              </Text>
-            </View>
-
-            {/* Form di modifica */}
-            <View style={{ flex: 1 }}>
-              <View style={{
-                padding: 20,
-                borderRadius: 16,
-                backgroundColor: Colors.light.cardBackground,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.05,
-                shadowRadius: 1,
-                elevation: 1,
-                marginBottom: 24
-              }}>
-                <View style={{ gap: 16 }}>
-                  <View>
-                    <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8, color: Colors.light.text }}>
-                      Nome
-                    </Text>
-                    <TextInput
-                      value={nome}
-                      onChangeText={setNome}
-                      style={{
-                        backgroundColor: '#f2f2f7',
-                        borderRadius: 12,
-                        padding: 16,
-                        fontSize: 16,
-                        color: Colors.light.text,
-                        borderWidth: 0
-                      }}
-                      placeholder="Inserisci il tuo nome"
-                      placeholderTextColor={Colors.light.textSecondary}
-                    />
-                  </View>
-
-                  <View>
-                    <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8, color: Colors.light.text }}>
-                      Cognome
-                    </Text>
-                    <TextInput
-                      value={cognome}
-                      onChangeText={setCognome}
-                      style={{
-                        backgroundColor: '#f2f2f7',
-                        borderRadius: 12,
-                        padding: 16,
-                        fontSize: 16,
-                        color: Colors.light.text,
-                        borderWidth: 0
-                      }}
-                      placeholder="Inserisci il tuo cognome"
-                      placeholderTextColor={Colors.light.textSecondary}
-                    />
-                  </View>
-
-                  <View>
-                    <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 8, color: Colors.light.text }}>
-                      Email
-                    </Text>
-                    <View style={{
-                      backgroundColor: '#f2f2f7',
-                      borderRadius: 12,
-                      padding: 16,
-                      opacity: 0.6
-                    }}>
-                      <Text style={{ fontSize: 16, color: Colors.light.textSecondary }}>
-                        {email}
-                      </Text>
-                    </View>
-                    <Text style={{ fontSize: 12, color: Colors.light.textSecondary, marginTop: 4 }}>
-                      L'email non può essere modificata
-                    </Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Logout nel profilo */}
-              <MenuSection title="Account">
-                <MenuItem 
-                  icon="log-out"
-                  title="Logout"
-                  subtitle="Esci dall'app"
-                  onPress={handleLogout}
-                  isLast
-                />
-              </MenuSection>
-
-              {/* Pulsanti azione */}
-              <View style={{ flexDirection: 'row', gap: 12, paddingBottom: 20 }}>
-                <Pressable 
-                  onPress={handleCancelEditProfile}
-                  disabled={saveLoading}
-                  style={{ 
-                    flex: 1, 
-                    padding: 16, 
-                    borderRadius: 12, 
-                    backgroundColor: Colors.light.cardBackground, 
-                    borderWidth: 1,
-                    borderColor: Colors.light.border,
-                    alignItems: 'center',
-                    opacity: saveLoading ? 0.5 : 1
-                  }}
-                >
-                  <Text style={{ fontWeight: '600', color: Colors.light.text }}>Annulla</Text>
-                </Pressable>
-                <Pressable 
-                  onPress={handleSaveProfile}
-                  disabled={saveLoading}
-                  style={{ 
-                    flex: 1, 
-                    padding: 16, 
-                    borderRadius: 12, 
-                    backgroundColor: Colors.light.tint, 
-                    alignItems: 'center',
-                    opacity: saveLoading ? 0.6 : 1
-                  }}
-                >
-                  <Text style={{ color: '#fff', fontWeight: '600' }}>
-                    {saveLoading ? 'Salvataggio...' : 'Salva'}
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
+            <MaterialCommunityIcons name={icon as any} size={18} color="#fff" />
           </View>
-        </ScrollView>
-      </SafeAreaView>
+          <View style={{ flex: 1 }}>
+            <Text style={{ 
+              fontSize: 16, 
+              fontWeight: '600',
+              color: Colors.light.text 
+            }}>
+              {title}
+            </Text>
+            {subtitle && (
+              <Text style={{ 
+                fontSize: 14, 
+                color: Colors.light.textSecondary,
+                marginTop: 2
+              }}>
+                {subtitle}
+              </Text>
+            )}
+          </View>
+          {rightElement || (
+            <MaterialCommunityIcons name="chevron-right" size={14} color={Colors.light.textSecondary} />
+          )}
+        </Pressable>
+                          {!isLast && (
+                    <View style={{
+                      height: 0.33,
+                      backgroundColor: Colors.light.border,
+                      marginLeft: 57
+                    }} />
+                  )}
+      </View>
     );
   }
 
@@ -400,23 +224,25 @@ export default function Impostazioni() {
           {/* Profilo */}
           <MenuSection title="Profilo">
             <Pressable
-              onPress={() => setIsEditingProfile(true)}
+              onPress={() => router.push('/profile-edit')}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                padding: 16
+                paddingVertical: 12,
+                paddingHorizontal: 16,
+                minHeight: 44
               }}
             >
               <View style={{
-                width: 50,
-                height: 50,
-                borderRadius: 25,
+                width: 29,
+                height: 29,
+                borderRadius: 6,
                 backgroundColor: Colors.light.tint,
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginRight: 12
               }}>
-                <Ionicons name="person" size={24} color="#fff" />
+                <MaterialCommunityIcons name="account" size={18} color="#fff" />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={{ 
@@ -434,23 +260,28 @@ export default function Impostazioni() {
                   {email}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.light.textSecondary} />
+              <MaterialCommunityIcons name="chevron-right" size={14} color={Colors.light.textSecondary} />
             </Pressable>
           </MenuSection>
 
           {/* Notifiche */}
           <MenuSection title="Notifiche">
             <MenuItem 
-              icon="notifications"
-              title="Notifiche scadenze"
-              subtitle="Configura promemoria per le scadenze"
-              onPress={navigateToNotificheScadenze}
+              icon="bell"
+              title="Notifiche"
+              subtitle="Configura avvisi e promemoria"
+              onPress={navigateToNotifications}
+              isLast
             />
+          </MenuSection>
+
+          {/* Account */}
+          <MenuSection title="Account">
             <MenuItem 
-              icon="alarm"
-              title="Promemoria"
-              subtitle="Imposta promemoria personalizzati"
-              onPress={navigateToPromemoria}
+              icon="logout"
+              title="Logout"
+              subtitle="Esci dall'app"
+              onPress={handleLogout}
               isLast
             />
           </MenuSection>
@@ -458,16 +289,22 @@ export default function Impostazioni() {
           {/* Informazioni */}
           <MenuSection title="Informazioni">
             <MenuItem 
-              icon="information-circle"
+              icon="information"
               title="Info sull'app"
               subtitle="Versione e dettagli"
               onPress={showAppInfo}
+              rightElement={
+                <MaterialCommunityIcons name="information" size={16} color={Colors.light.textSecondary} />
+              }
             />
             <MenuItem 
               icon="help-circle"
               title="Supporto"
               subtitle="Contatta l'assistenza"
               onPress={showSupport}
+              rightElement={
+                <MaterialCommunityIcons name="information" size={16} color={Colors.light.textSecondary} />
+              }
               isLast
             />
           </MenuSection>
