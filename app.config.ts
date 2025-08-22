@@ -6,7 +6,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: 'Pratico',
   slug: 'pratico-app',
   scheme: 'pratico',
-  version: '1.0.2',
+  version: '1.0.3',
   orientation: 'portrait',
   icon: './assets/icon.png',
   userInterfaceStyle: 'light',
@@ -19,7 +19,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ios: {
     supportsTablet: true,
     bundleIdentifier: 'it.extendi.pratico',
-    buildNumber: '10',
+    buildNumber: '11',
     userInterfaceStyle: 'light',
     infoPlist: {
       NSCameraUsageDescription: 'Questa app usa la fotocamera per scattare foto dei documenti da allegare.',
@@ -34,7 +34,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       backgroundColor: '#ffffff'
     },
     package: 'it.extendi.pratico',
-    versionCode: 2,
+    versionCode: 3,
     userInterfaceStyle: 'light',
     permissions: [
       'android.permission.CAMERA',
