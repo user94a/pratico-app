@@ -1,25 +1,24 @@
 import { Colors } from '@/constants/Colors';
-import { RECURRENCE_TEMPLATES } from '@/lib/api';
-import { supabase } from '@/lib/supabase';
-import { Asset, Document } from '@/lib/types';
+import { createDeadline, getAssets, getDocuments } from '@/lib/api';
+import { Asset, Document, Deadline } from '@/lib/types';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import React, { useEffect, useState } from 'react';
-import { Alert, FlatList, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, FlatList, Modal, Platform, Pressable, ScrollView, Text, TextInput, View, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+
+// Template per le ricorrenze
+const RECURRENCE_TEMPLATES = {
+  daily: { label: 'Giornaliera', rule: 'FREQ=DAILY' },
+  weekly: { label: 'Settimanale', rule: 'FREQ=WEEKLY' },
+  monthly: { label: 'Mensile', rule: 'FREQ=MONTHLY' },
+  yearly: { label: 'Annuale', rule: 'FREQ=YEARLY' }
+};
 
 export function AddDeadlineModal({ visible, onClose, onSubmit }: {
   visible: boolean;
   onClose: () => void;
-  onSubmit: (input: { 
-    title: string; 
-    dueAt: string; 
-    notes?: string; 
-    isRecurring?: boolean;
-    recurrenceRule?: string;
-    selectedAssets?: Asset[];
-    selectedDocuments?: Document[];
-  }) => void;
+  onSubmit: (deadline: Deadline) => void;
 }) {
   const [title, setTitle] = useState('');
   const [dueDate, setDueDate] = useState(new Date());
@@ -37,6 +36,9 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
   const [showDocumentPicker, setShowDocumentPicker] = useState(false);
   const [assetSearchText, setAssetSearchText] = useState('');
   const [documentSearchText, setDocumentSearchText] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [loadingAssets, setLoadingAssets] = useState(false);
+  const [loadingDocuments, setLoadingDocuments] = useState(false);
 
   // Carica beni e documenti disponibili
   useEffect(() => {
@@ -48,29 +50,27 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
 
   const loadAvailableAssets = async () => {
     try {
-      const { data, error } = await supabase
-        .from('assets')
-        .select('*')
-        .order('name');
-      
-      if (error) throw error;
-      setAvailableAssets(data || []);
-    } catch (error) {
+      setLoadingAssets(true);
+      const data = await getAssets();
+      setAvailableAssets(data);
+    } catch (error: any) {
       console.error('Errore nel caricamento dei beni:', error);
+      Alert.alert('Errore', 'Impossibile caricare i beni');
+    } finally {
+      setLoadingAssets(false);
     }
   };
 
   const loadAvailableDocuments = async () => {
     try {
-      const { data, error } = await supabase
-        .from('documents')
-        .select('*')
-        .order('title');
-      
-      if (error) throw error;
-      setAvailableDocuments(data || []);
-    } catch (error) {
+      setLoadingDocuments(true);
+      const data = await getDocuments();
+      setAvailableDocuments(data);
+    } catch (error: any) {
       console.error('Errore nel caricamento dei documenti:', error);
+      Alert.alert('Errore', 'Impossibile caricare i documenti');
+    } finally {
+      setLoadingDocuments(false);
     }
   };
 
@@ -80,30 +80,50 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!title.trim()) {
       Alert.alert('Errore', 'Il titolo è obbligatorio');
       return;
     }
 
-    onSubmit({
-      title: title.trim(),
-      dueAt: dueDate.toISOString(),
-      notes: notes.trim() || undefined,
-      isRecurring,
-      recurrenceRule: isRecurring ? RECURRENCE_TEMPLATES[selectedRecurrence].rule : undefined,
-      selectedAssets: selectedAssets.length > 0 ? selectedAssets : undefined,
-      selectedDocuments: selectedDocuments.length > 0 ? selectedDocuments : undefined
-    });
+    try {
+      setSaving(true);
+      
+      const deadlineData = {
+        title: title.trim(),
+        due_at: dueDate.toISOString(),
+        notes: notes.trim() || null,
+        recurrence_rule: isRecurring ? RECURRENCE_TEMPLATES[selectedRecurrence].rule : null
+      };
 
-    // Reset form
-    setTitle('');
-    setDueDate(new Date());
-    setNotes('');
-    setIsRecurring(false);
-    setSelectedRecurrence('monthly');
-    setSelectedAssets([]);
-    setSelectedDocuments([]);
+      const newDeadline = await createDeadline(deadlineData);
+      
+      // TODO: Associare beni e documenti selezionati
+      // Per ora creiamo solo la scadenza base
+      
+      onSubmit(newDeadline);
+
+      // Reset form
+      setTitle('');
+      setDueDate(new Date());
+      setNotes('');
+      setIsRecurring(false);
+      setSelectedRecurrence('monthly');
+      setSelectedAssets([]);
+      setSelectedDocuments([]);
+    } catch (error: any) {
+      console.error('Errore nella creazione della scadenza:', error);
+      Alert.alert(
+        'Errore di connessione', 
+        error.message || 'Impossibile creare la scadenza. Verifica la tua connessione internet.',
+        [
+          { text: 'Riprova', onPress: () => handleSubmit() },
+          { text: 'Annulla', style: 'cancel' }
+        ]
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleClose = () => {
@@ -155,7 +175,7 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
   return (
     <>
       <Modal visible={visible} animationType="slide" presentationStyle="pageSheet">
-        <SafeAreaView style={{ flex: 1, backgroundColor: Colors.light.background }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
           {/* Header */}
           <View style={{
             flexDirection: 'row',
@@ -164,15 +184,13 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
             paddingHorizontal: 16,
             paddingVertical: 12,
             borderBottomWidth: 0.33,
-            borderBottomColor: Colors.light.border,
-            backgroundColor: Colors.light.cardBackground
+            borderBottomColor: '#e5e5ea',
+            backgroundColor: '#fff'
           }}>
-            <Pressable
-              onPress={handleClose}
-            >
+            <Pressable onPress={handleClose}>
               <Text style={{ 
                 fontSize: 16, 
-                color: Colors.light.textSecondary, 
+                color: '#666', 
                 fontWeight: '600' 
               }}>
                 Annulla
@@ -182,22 +200,22 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
             <Text style={{
               fontSize: 17,
               fontWeight: '600',
-              color: Colors.light.text
+              color: '#333'
             }}>
               Aggiungi Scadenza
             </Text>
 
             <Pressable
               onPress={handleSubmit}
-              disabled={!title.trim()}
-              style={{ opacity: title.trim() ? 1 : 0.5 }}
+              disabled={!title.trim() || saving}
+              style={{ opacity: (title.trim() && !saving) ? 1 : 0.5 }}
             >
               <Text style={{ 
                 fontSize: 16, 
-                color: Colors.light.tint, 
+                color: '#0a84ff', 
                 fontWeight: '600' 
               }}>
-                Aggiungi
+                {saving ? 'Salvo...' : 'Aggiungi'}
               </Text>
             </Pressable>
           </View>
@@ -207,15 +225,14 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
             contentContainerStyle={{ padding: 16, paddingBottom: 32 }}
             showsVerticalScrollIndicator={false}
           >
-          <View style={{ gap: 12 }}>
+          <View style={{ gap: 16 }}>
             {/* Titolo */}
-            <View style={{ marginBottom: 12 }}>
+            <View>
               <Text style={{ 
                 fontSize: 16, 
                 fontWeight: '600', 
-                color: Colors.light.text,
-                marginBottom: 12,
-                marginLeft: 4
+                color: '#333',
+                marginBottom: 8
               }}>
                 Titolo *
               </Text>
@@ -223,65 +240,54 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
                 value={title}
                 onChangeText={setTitle}
                 style={{ 
-                  backgroundColor: Colors.light.cardBackground,
-                  borderRadius: 16,
+                  backgroundColor: '#f2f2f7',
+                  borderRadius: 12,
                   padding: 16,
                   fontSize: 16,
-                  color: Colors.light.text,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 1,
-                  elevation: 1
+                  color: '#333'
                 }}
+                placeholder="Inserisci il titolo della scadenza"
               />
             </View>
 
             {/* Data Scadenza */}
-            <View style={{ marginBottom: 12 }}>
+            <View>
               <Text style={{ 
                 fontSize: 16, 
                 fontWeight: '600', 
-                color: Colors.light.text,
-                marginBottom: 12,
-                marginLeft: 4
+                color: '#333',
+                marginBottom: 8
               }}>
                 Data Scadenza *
               </Text>
               <Pressable
                 onPress={() => setShowDatePicker(true)}
                 style={{ 
-                  backgroundColor: Colors.light.cardBackground,
-                  borderRadius: 16,
+                  backgroundColor: '#f2f2f7',
+                  borderRadius: 12,
                   padding: 16,
                   flexDirection: 'row',
                   alignItems: 'center',
-                  justifyContent: 'space-between',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 1,
-                  elevation: 1
+                  justifyContent: 'space-between'
                 }}
               >
                 <Text style={{ 
                   fontSize: 16,
-                  color: Colors.light.text
+                  color: '#333'
                 }}>
                   {dueDate.toLocaleDateString('it-IT')}
                 </Text>
-                <MaterialCommunityIcons name="calendar" size={20} color={Colors.light.tint} />
+                <MaterialCommunityIcons name="calendar" size={20} color="#0a84ff" />
               </Pressable>
             </View>
 
             {/* Note */}
-            <View style={{ marginBottom: 12 }}>
+            <View>
               <Text style={{ 
                 fontSize: 16, 
                 fontWeight: '600', 
-                color: Colors.light.text,
-                marginBottom: 12,
-                marginLeft: 4
+                color: '#333',
+                marginBottom: 8
               }}>
                 Note
               </Text>
@@ -291,211 +297,23 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
                 multiline
                 numberOfLines={3}
                 style={{ 
-                  backgroundColor: Colors.light.cardBackground,
-                  borderRadius: 16, 
+                  backgroundColor: '#f2f2f7',
+                  borderRadius: 12, 
                   padding: 16, 
                   height: 80,
                   fontSize: 16,
-                  color: Colors.light.text,
-                  borderWidth: 0,
-                  textAlignVertical: 'top',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 1,
-                  elevation: 1
+                  color: '#333',
+                  textAlignVertical: 'top'
                 }}
+                placeholder="Inserisci note aggiuntive (opzionale)"
               />
-            </View>
-
-            {/* Beni Associati */}
-            <View style={{ marginBottom: 12 }}>
-              <Text style={{ 
-                fontSize: 16, 
-                fontWeight: '600', 
-                color: Colors.light.text,
-                marginBottom: 12,
-                marginLeft: 4
-              }}>
-                Beni Associati
-              </Text>
-              
-              {/* Beni selezionati */}
-              {selectedAssets.length > 0 && (
-                <View style={{ 
-                  backgroundColor: Colors.light.cardBackground,
-                  borderRadius: 16,
-                  padding: 16,
-                  marginBottom: 12,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 1,
-                  elevation: 1
-                }}>
-                  {selectedAssets.map((asset) => (
-                    <View key={asset.id} style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      paddingVertical: 8,
-                      borderBottomWidth: 0.33,
-                      borderBottomColor: Colors.light.border
-                    }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                        <MaterialCommunityIcons 
-                          name={asset.custom_icon || 'package'} 
-                          size={20} 
-                          color={Colors.light.tint} 
-                        />
-                        <Text style={{
-                          fontSize: 16,
-                          color: Colors.light.text,
-                          marginLeft: 12,
-                          flex: 1
-                        }}>
-                          {asset.name}
-                        </Text>
-                      </View>
-                      <Pressable
-                        onPress={() => removeAsset(asset.id)}
-                        style={{
-                          padding: 4
-                        }}
-                      >
-                        <MaterialCommunityIcons name="close" size={16} color={Colors.light.textSecondary} />
-                      </Pressable>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {/* Pulsante per aggiungere beni */}
-              <Pressable
-                onPress={() => setShowAssetPicker(true)}
-                style={{ 
-                  backgroundColor: Colors.light.cardBackground,
-                  borderRadius: 16,
-                  padding: 16,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 1,
-                  elevation: 1
-                }}
-              >
-                <Text style={{ 
-                  fontSize: 16,
-                  color: Colors.light.text
-                }}>
-                  {selectedAssets.length > 0 ? `Aggiungi altri beni (${selectedAssets.length} selezionati)` : 'Aggiungi beni'}
-                </Text>
-                <MaterialCommunityIcons name="plus" size={20} color={Colors.light.tint} />
-              </Pressable>
-            </View>
-
-            {/* Documenti Associati */}
-            <View style={{ marginBottom: 12 }}>
-              <Text style={{ 
-                fontSize: 16, 
-                fontWeight: '600', 
-                color: Colors.light.text,
-                marginBottom: 12,
-                marginLeft: 4
-              }}>
-                Documenti Associati
-              </Text>
-              
-              {/* Documenti selezionati */}
-              {selectedDocuments.length > 0 && (
-                <View style={{ 
-                  backgroundColor: Colors.light.cardBackground,
-                  borderRadius: 16,
-                  padding: 16,
-                  marginBottom: 12,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 1,
-                  elevation: 1
-                }}>
-                  {selectedDocuments.map((document) => (
-                    <View key={document.id} style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      paddingVertical: 8,
-                      borderBottomWidth: 0.33,
-                      borderBottomColor: Colors.light.border
-                    }}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                        <MaterialCommunityIcons 
-                          name="text-box" 
-                          size={20} 
-                          color={Colors.light.tint} 
-                        />
-                        <Text style={{
-                          fontSize: 16,
-                          color: Colors.light.text,
-                          marginLeft: 12,
-                          flex: 1
-                        }}>
-                          {document.title}
-                        </Text>
-                      </View>
-                      <Pressable
-                        onPress={() => removeDocument(document.id)}
-                        style={{
-                          padding: 4
-                        }}
-                      >
-                        <MaterialCommunityIcons name="close" size={16} color={Colors.light.textSecondary} />
-                      </Pressable>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {/* Pulsante per aggiungere documenti */}
-              <Pressable
-                onPress={() => setShowDocumentPicker(true)}
-                style={{ 
-                  backgroundColor: Colors.light.cardBackground,
-                  borderRadius: 16,
-                  padding: 16,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 1,
-                  elevation: 1
-                }}
-              >
-                <Text style={{ 
-                  fontSize: 16,
-                  color: Colors.light.text
-                }}>
-                  {selectedDocuments.length > 0 ? `Aggiungi altri documenti (${selectedDocuments.length} selezionati)` : 'Aggiungi documenti'}
-                </Text>
-                <MaterialCommunityIcons name="plus" size={20} color={Colors.light.tint} />
-              </Pressable>
             </View>
 
             {/* Scadenza Ricorrente */}
             <View style={{
-              backgroundColor: Colors.light.cardBackground,
-              borderRadius: 16,
-              padding: 20,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.05,
-              shadowRadius: 1,
-              elevation: 1
+              backgroundColor: '#f2f2f7',
+              borderRadius: 12,
+              padding: 16
             }}>
               <View style={{ 
                 flexDirection: 'row', 
@@ -506,7 +324,7 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
                 <Text style={{ 
                   fontSize: 16, 
                   fontWeight: '600',
-                  color: Colors.light.text
+                  color: '#333'
                 }}>
                   Scadenza ricorrente
                 </Text>
@@ -516,7 +334,7 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
                     width: 51,
                     height: 31,
                     borderRadius: 15.5,
-                    backgroundColor: isRecurring ? Colors.light.tint : Colors.light.border,
+                    backgroundColor: isRecurring ? '#0a84ff' : '#e5e5ea',
                     alignItems: 'center',
                     justifyContent: 'center'
                   }}
@@ -532,10 +350,10 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
               </View>
 
               {isRecurring && (
-                <View style={{ gap: 12 }}>
+                <View style={{ gap: 8 }}>
                   <Text style={{ 
                     fontSize: 14, 
-                    color: Colors.light.textSecondary,
+                    color: '#666',
                     marginBottom: 8
                   }}>
                     Seleziona la frequenza:
@@ -550,7 +368,7 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
                         paddingVertical: 12,
                         paddingHorizontal: 16,
                         borderRadius: 8,
-                        backgroundColor: selectedRecurrence === key ? Colors.light.tint + '15' : 'transparent'
+                        backgroundColor: selectedRecurrence === key ? '#0a84ff15' : 'transparent'
                       }}
                     >
                       <View style={{
@@ -558,8 +376,8 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
                         height: 20,
                         borderRadius: 10,
                         borderWidth: 2,
-                        borderColor: selectedRecurrence === key ? Colors.light.tint : Colors.light.border,
-                        backgroundColor: selectedRecurrence === key ? Colors.light.tint : 'transparent',
+                        borderColor: selectedRecurrence === key ? '#0a84ff' : '#e5e5ea',
+                        backgroundColor: selectedRecurrence === key ? '#0a84ff' : 'transparent',
                         alignItems: 'center',
                         justifyContent: 'center',
                         marginRight: 12
@@ -570,7 +388,7 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
                       </View>
                       <Text style={{
                         fontSize: 16,
-                        color: Colors.light.text,
+                        color: '#333',
                         fontWeight: selectedRecurrence === key ? '600' : '400'
                       }}>
                         {RECURRENCE_TEMPLATES[key].label}
@@ -579,6 +397,162 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
                   ))}
                 </View>
               )}
+            </View>
+
+            {/* Beni Associati */}
+            <View>
+              <Text style={{ 
+                fontSize: 16, 
+                fontWeight: '600', 
+                color: '#333',
+                marginBottom: 8
+              }}>
+                Beni Associati
+              </Text>
+              
+              {/* Beni selezionati */}
+              {selectedAssets.length > 0 && (
+                <View style={{ 
+                  backgroundColor: '#f2f2f7',
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 12
+                }}>
+                  {selectedAssets.map((asset) => (
+                    <View key={asset.id} style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: 8,
+                      borderBottomWidth: 0.33,
+                      borderBottomColor: '#e5e5ea'
+                    }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                        <MaterialCommunityIcons 
+                          name={asset.custom_icon || 'package'} 
+                          size={20} 
+                          color="#0a84ff" 
+                        />
+                        <Text style={{
+                          fontSize: 16,
+                          color: '#333',
+                          marginLeft: 12,
+                          flex: 1
+                        }}>
+                          {asset.name}
+                        </Text>
+                      </View>
+                      <Pressable
+                        onPress={() => removeAsset(asset.id)}
+                        style={{
+                          padding: 4
+                        }}
+                      >
+                        <MaterialCommunityIcons name="close" size={16} color="#666" />
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Pulsante per aggiungere beni */}
+              <Pressable
+                onPress={() => setShowAssetPicker(true)}
+                style={{ 
+                  backgroundColor: '#f2f2f7',
+                  borderRadius: 12,
+                  padding: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
+                <Text style={{ 
+                  fontSize: 16,
+                  color: '#333'
+                }}>
+                  {selectedAssets.length > 0 ? `Aggiungi altri beni (${selectedAssets.length} selezionati)` : 'Aggiungi beni'}
+                </Text>
+                <MaterialCommunityIcons name="plus" size={20} color="#0a84ff" />
+              </Pressable>
+            </View>
+
+            {/* Documenti Associati */}
+            <View>
+              <Text style={{ 
+                fontSize: 16, 
+                fontWeight: '600', 
+                color: '#333',
+                marginBottom: 8
+              }}>
+                Documenti Associati
+              </Text>
+              
+              {/* Documenti selezionati */}
+              {selectedDocuments.length > 0 && (
+                <View style={{ 
+                  backgroundColor: '#f2f2f7',
+                  borderRadius: 12,
+                  padding: 16,
+                  marginBottom: 12
+                }}>
+                  {selectedDocuments.map((document) => (
+                    <View key={document.id} style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      paddingVertical: 8,
+                      borderBottomWidth: 0.33,
+                      borderBottomColor: '#e5e5ea'
+                    }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                        <MaterialCommunityIcons 
+                          name="text-box" 
+                          size={20} 
+                          color="#0a84ff" 
+                        />
+                        <Text style={{
+                          fontSize: 16,
+                          color: '#333',
+                          marginLeft: 12,
+                          flex: 1
+                        }}>
+                          {document.title}
+                        </Text>
+                      </View>
+                      <Pressable
+                        onPress={() => removeDocument(document.id)}
+                        style={{
+                          padding: 4
+                        }}
+                      >
+                        <MaterialCommunityIcons name="close" size={16} color="#666" />
+                      </Pressable>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Pulsante per aggiungere documenti */}
+              <Pressable
+                onPress={() => setShowDocumentPicker(true)}
+                style={{ 
+                  backgroundColor: '#f2f2f7',
+                  borderRadius: 12,
+                  padding: 16,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between'
+                }}
+              >
+                <Text style={{ 
+                  fontSize: 16,
+                  color: '#333'
+                }}>
+                  {selectedDocuments.length > 0 ? `Aggiungi altri documenti (${selectedDocuments.length} selezionati)` : 'Aggiungi documenti'}
+                </Text>
+                <MaterialCommunityIcons name="plus" size={20} color="#0a84ff" />
+              </Pressable>
             </View>
           </View>
         </ScrollView>
@@ -590,9 +564,9 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
             bottom: 0,
             left: 0,
             right: 0,
-            backgroundColor: Colors.light.cardBackground,
+            backgroundColor: '#fff',
             borderTopWidth: 0.33,
-            borderTopColor: Colors.light.border,
+            borderTopColor: '#e5e5ea',
             paddingBottom: 20
           }}>
             <View style={{
@@ -602,12 +576,12 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
               paddingHorizontal: 16,
               paddingVertical: 12,
               borderBottomWidth: 0.33,
-              borderBottomColor: Colors.light.border
+              borderBottomColor: '#e5e5ea'
             }}>
               <Pressable onPress={() => setShowDatePicker(false)}>
                 <Text style={{ 
                   fontSize: 16, 
-                  color: Colors.light.textSecondary, 
+                  color: '#666', 
                   fontWeight: '600' 
                 }}>
                   Annulla
@@ -617,7 +591,7 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
               <Text style={{
                 fontSize: 17,
                 fontWeight: '600',
-                color: Colors.light.text
+                color: '#333'
               }}>
                 Seleziona Data
               </Text>
@@ -625,7 +599,7 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
               <Pressable onPress={() => setShowDatePicker(false)}>
                 <Text style={{ 
                   fontSize: 16, 
-                  color: Colors.light.tint, 
+                  color: '#0a84ff', 
                   fontWeight: '600' 
                 }}>
                   Fatto
@@ -645,7 +619,7 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
 
         {/* Modal per selezione beni */}
         <Modal visible={showAssetPicker} animationType="slide" presentationStyle="pageSheet">
-          <SafeAreaView style={{ flex: 1, backgroundColor: Colors.light.background }}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
             {/* Header */}
             <View style={{
               flexDirection: 'row',
@@ -654,13 +628,13 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
               paddingHorizontal: 16,
               paddingVertical: 12,
               borderBottomWidth: 0.33,
-              borderBottomColor: Colors.light.border,
-              backgroundColor: Colors.light.cardBackground
+              borderBottomColor: '#e5e5ea',
+              backgroundColor: '#fff'
             }}>
               <Pressable onPress={() => setShowAssetPicker(false)}>
                 <Text style={{ 
                   fontSize: 16, 
-                  color: Colors.light.textSecondary, 
+                  color: '#666', 
                   fontWeight: '600' 
                 }}>
                   Annulla
@@ -670,7 +644,7 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
               <Text style={{
                 fontSize: 17,
                 fontWeight: '600',
-                color: Colors.light.text
+                color: '#333'
               }}>
                 Seleziona Beni
               </Text>
@@ -678,7 +652,7 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
               <Pressable onPress={() => setShowAssetPicker(false)}>
                 <Text style={{ 
                   fontSize: 16, 
-                  color: Colors.light.tint, 
+                  color: '#0a84ff', 
                   fontWeight: '600' 
                 }}>
                   Fatto
@@ -692,75 +666,78 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
                 value={assetSearchText}
                 onChangeText={setAssetSearchText}
                 style={{ 
-                  backgroundColor: Colors.light.cardBackground,
-                  borderRadius: 16,
+                  backgroundColor: '#f2f2f7',
+                  borderRadius: 12,
                   padding: 16,
                   fontSize: 16,
-                  color: Colors.light.text,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 1,
-                  elevation: 1
+                  color: '#333'
                 }}
+                placeholder="Cerca beni..."
               />
             </View>
 
             {/* Lista beni */}
-            <FlatList
-              data={filteredAssets}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => {
-                const isSelected = selectedAssets.find(a => a.id === item.id);
-                return (
-                  <Pressable
-                    onPress={() => handleAssetSelection(item)}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      paddingHorizontal: 16,
-                      paddingVertical: 12,
-                      backgroundColor: isSelected ? Colors.light.tint + '15' : 'transparent'
-                    }}
-                  >
-                    <View style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: 10,
-                      borderWidth: 2,
-                      borderColor: isSelected ? Colors.light.tint : Colors.light.border,
-                      backgroundColor: isSelected ? Colors.light.tint : 'transparent',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginRight: 12
-                    }}>
-                      {isSelected && (
-                        <MaterialCommunityIcons name="check" size={12} color="#fff" />
-                      )}
-                    </View>
-                    <MaterialCommunityIcons 
-                      name={item.custom_icon || 'package'} 
-                      size={20} 
-                      color={Colors.light.tint} 
-                    />
-                    <Text style={{
-                      fontSize: 16,
-                      color: Colors.light.text,
-                      marginLeft: 12,
-                      flex: 1
-                    }}>
-                      {item.name}
-                    </Text>
-                  </Pressable>
-                );
-              }}
-            />
+            {loadingAssets ? (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#0a84ff" />
+                <Text style={{ marginTop: 16, color: '#666' }}>Caricamento beni...</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredAssets}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => {
+                  const isSelected = selectedAssets.find(a => a.id === item.id);
+                  return (
+                    <Pressable
+                      onPress={() => handleAssetSelection(item)}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                        backgroundColor: isSelected ? '#0a84ff15' : 'transparent'
+                      }}
+                    >
+                      <View style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
+                        borderWidth: 2,
+                        borderColor: isSelected ? '#0a84ff' : '#e5e5ea',
+                        backgroundColor: isSelected ? '#0a84ff' : 'transparent',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: 12
+                      }}>
+                        {isSelected && (
+                          <MaterialCommunityIcons name="check" size={12} color="#fff" />
+                        )}
+                      </View>
+                      <MaterialCommunityIcons 
+                        name={item.custom_icon || 'package'} 
+                        size={20} 
+                        color="#0a84ff" 
+                      />
+                      <Text style={{
+                        fontSize: 16,
+                        color: '#333',
+                        marginLeft: 12,
+                        flex: 1
+                      }}>
+                        {item.name}
+                      </Text>
+                    </Pressable>
+                  );
+                }}
+              />
+            )}
           </SafeAreaView>
         </Modal>
 
         {/* Modal per selezione documenti */}
         <Modal visible={showDocumentPicker} animationType="slide" presentationStyle="pageSheet">
-          <SafeAreaView style={{ flex: 1, backgroundColor: Colors.light.background }}>
+          <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
             {/* Header */}
             <View style={{
               flexDirection: 'row',
@@ -769,13 +746,13 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
               paddingHorizontal: 16,
               paddingVertical: 12,
               borderBottomWidth: 0.33,
-              borderBottomColor: Colors.light.border,
-              backgroundColor: Colors.light.cardBackground
+              borderBottomColor: '#e5e5ea',
+              backgroundColor: '#fff'
             }}>
               <Pressable onPress={() => setShowDocumentPicker(false)}>
                 <Text style={{ 
                   fontSize: 16, 
-                  color: Colors.light.textSecondary, 
+                  color: '#666', 
                   fontWeight: '600' 
                 }}>
                   Annulla
@@ -785,7 +762,7 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
               <Text style={{
                 fontSize: 17,
                 fontWeight: '600',
-                color: Colors.light.text
+                color: '#333'
               }}>
                 Seleziona Documenti
               </Text>
@@ -793,7 +770,7 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
               <Pressable onPress={() => setShowDocumentPicker(false)}>
                 <Text style={{ 
                   fontSize: 16, 
-                  color: Colors.light.tint, 
+                  color: '#0a84ff', 
                   fontWeight: '600' 
                 }}>
                   Fatto
@@ -807,69 +784,72 @@ export function AddDeadlineModal({ visible, onClose, onSubmit }: {
                 value={documentSearchText}
                 onChangeText={setDocumentSearchText}
                 style={{ 
-                  backgroundColor: Colors.light.cardBackground,
-                  borderRadius: 16,
+                  backgroundColor: '#f2f2f7',
+                  borderRadius: 12,
                   padding: 16,
                   fontSize: 16,
-                  color: Colors.light.text,
-                  shadowColor: '#000',
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.05,
-                  shadowRadius: 1,
-                  elevation: 1
+                  color: '#333'
                 }}
+                placeholder="Cerca documenti..."
               />
             </View>
 
             {/* Lista documenti */}
-            <FlatList
-              data={filteredDocuments}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => {
-                const isSelected = selectedDocuments.find(d => d.id === item.id);
-                return (
-                  <Pressable
-                    onPress={() => handleDocumentSelection(item)}
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      paddingHorizontal: 16,
-                      paddingVertical: 12,
-                      backgroundColor: isSelected ? Colors.light.tint + '15' : 'transparent'
-                    }}
-                  >
-                    <View style={{
-                      width: 20,
-                      height: 20,
-                      borderRadius: 10,
-                      borderWidth: 2,
-                      borderColor: isSelected ? Colors.light.tint : Colors.light.border,
-                      backgroundColor: isSelected ? Colors.light.tint : 'transparent',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      marginRight: 12
-                    }}>
-                      {isSelected && (
-                        <MaterialCommunityIcons name="check" size={12} color="#fff" />
-                      )}
-                    </View>
-                    <MaterialCommunityIcons 
-                      name="text-box" 
-                      size={20} 
-                      color={Colors.light.tint} 
-                    />
-                    <Text style={{
-                      fontSize: 16,
-                      color: Colors.light.text,
-                      marginLeft: 12,
-                      flex: 1
-                    }}>
-                      {item.title}
-                    </Text>
-                  </Pressable>
-                );
-              }}
-            />
+            {loadingDocuments ? (
+              <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#0a84ff" />
+                <Text style={{ marginTop: 16, color: '#666' }}>Caricamento documenti...</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredDocuments}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => {
+                  const isSelected = selectedDocuments.find(d => d.id === item.id);
+                  return (
+                    <Pressable
+                      onPress={() => handleDocumentSelection(item)}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        paddingHorizontal: 16,
+                        paddingVertical: 12,
+                        backgroundColor: isSelected ? '#0a84ff15' : 'transparent'
+                      }}
+                    >
+                      <View style={{
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
+                        borderWidth: 2,
+                        borderColor: isSelected ? '#0a84ff' : '#e5e5ea',
+                        backgroundColor: isSelected ? '#0a84ff' : 'transparent',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: 12
+                      }}>
+                        {isSelected && (
+                          <MaterialCommunityIcons name="check" size={12} color="#fff" />
+                        )}
+                      </View>
+                      <MaterialCommunityIcons 
+                        name="text-box" 
+                        size={20} 
+                        color="#0a84ff" 
+                      />
+                      <Text style={{
+                        fontSize: 16,
+                        color: '#333',
+                        marginLeft: 12,
+                        flex: 1
+                      }}>
+                        {item.title}
+                      </Text>
+                    </Pressable>
+                  );
+                }}
+              />
+            )}
           </SafeAreaView>
         </Modal>
       </SafeAreaView>

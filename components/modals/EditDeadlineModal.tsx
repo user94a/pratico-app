@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/Colors';
-import { supabase } from '@/lib/supabase';
+import { api } from '@/lib/api';
 import { Deadline } from '@/lib/types';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -43,7 +43,7 @@ export function EditDeadlineModal({ visible, deadline, onClose, onSave }: EditDe
 
     try {
       setSaving(true);
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from('deadlines')
         .update({
           title: title.trim(),

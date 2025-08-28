@@ -47,6 +47,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     eas: {
       projectId: 'd377ca36-f1f2-4347-9c19-5e6027aaf727'
     },
+
     apiUrl: process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.207:3001/api'
   },
   owner: 'extendi'

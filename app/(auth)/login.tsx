@@ -14,7 +14,7 @@ import {
     TextInput,
     View
 } from 'react-native';
-import { supabase } from '../../lib/supabase';
+import { api } from '@/lib/api';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -33,9 +33,9 @@ export default function Login() {
     try {
       console.log('Starting login process...');
       setLoading('in');
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await api.auth.signInWithPassword({ email, password });
       if (error) {
-        console.log('Supabase error:', error);
+        console.log('Login error:', error);
         throw error;
       }
       console.log('Login successful');
@@ -57,7 +57,7 @@ export default function Login() {
     if (!email) return Alert.alert('Inserisci l\'email', 'Inserisci l\'indirizzo email per reimpostare la password.');
     try {
       setLoading('reset');
-      const { error } = await supabase.auth.resetPasswordForEmail(email);
+      const { error } = await api.auth.resetPasswordForEmail(email);
       if (error) throw error;
 
       Alert.alert('Codice inviato', 'Abbiamo inviato un codice di 6 cifre alla tua email.', [

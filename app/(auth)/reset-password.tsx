@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Text, TextInput, View } from 'react-native';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '@/lib/api';
 
 export default function ResetPassword() {
   const [email, setEmail] = useState('');

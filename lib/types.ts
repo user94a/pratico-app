@@ -1,30 +1,47 @@
-export type Asset = {
+export interface AssetCategory {
   id: string;
-  type: 'vehicle' | 'home' | 'device' | 'appliance' | 'animal' | 'person' | 'subscription' | 'property' | 'investment' | 'other';
   name: string;
-  identifier: string | null;
-  custom_icon: string | null;
-  template_key: string | null; // Nuovo campo per il template del bene
+  description?: string;
+  icon: string;
+  sort_order: number;
+  asset_types?: AssetType[];
+}
+
+export interface AssetType {
+  id: string;
+  name: string;
+  description?: string;
+  icon: string;
+  asset_category_id: string;
+  sort_order: number;
+  asset_category?: AssetCategory;
+}
+
+export interface Asset {
+  id: string;
+  user_id: string;
+  name: string;
+  asset_category_id?: string;
+  asset_type_id?: string;
+  identifier?: string;
+  custom_icon?: string;
+  template_key?: string;
   created_at: string;
   updated_at: string;
-};
+  asset_category?: AssetCategory;
+  asset_type?: AssetType;
+}
 
 export type Deadline = {
   id: string;
   title: string;
   due_at: string;
-  status: 'pending' | 'done' | 'skipped';
-  recurrence_rrule: string | null;
+  status: 'pending' | 'done';
+  recurrence_rule: string | null;
   notes: string | null;
-  asset_id: string | null; // Mantenuto per retrocompatibilità
-  asset?: { name: string; type?: string; custom_icon?: string | null } | null; // Mantenuto per retrocompatibilità
-  assets?: Asset[] | null; // Nuovo: array di beni associati
-  documents?: Document[] | null; // Nuovo: array di documenti associati
-  completed_at: string | null;
-  base_due_at: string | null;
   created_at: string;
   updated_at: string;
-  user_id?: string; // Campo opzionale che può arrivare dal database
+  user_id?: string;
 };
 
 export type Document = {

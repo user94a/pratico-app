@@ -2,7 +2,7 @@ import { AddDocumentModal, AddDocumentModalRef } from '@/components/modals/AddDo
 import { AssetDetailModal } from '@/components/modals/AssetDetailModal';
 import { DeadlineDetailModal } from '@/components/modals/DeadlineDetailModal';
 import { Colors } from '@/constants/Colors';
-import { createDocumentWithAssociations, getDocuments } from '@/lib/api';
+import { createDocument, getDocuments } from '@/lib/api';
 import { getAssetIcon } from '@/lib/assetIcons';
 import { Document } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
@@ -338,7 +338,7 @@ export default function Documenti() {
         onSubmit={async (result) => {
               try { 
             console.log('Creating document with data:', result);
-            await createDocumentWithAssociations(result as any);
+            await createDocument(result as any);
             await load(true); // Forza refresh dopo creazione
             Alert.alert('Successo', 'Documento creato con successo');
                 setShowDocument(false); 

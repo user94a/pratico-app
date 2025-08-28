@@ -1,522 +1,710 @@
-import * as FileSystem from 'expo-file-system';
-import { supabase } from './supabase';
+// lib/api.ts
+// API client for Rails backend with Cognito authentication
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 
-// ASSETS
-export type AssetInput = { 
-  name: string; 
-  type: string; 
-  identifier?: string; 
-  custom_icon?: string | null;
-  template_key?: string;
-};
-export async function createAsset(input: AssetInput) {
-  const payload = {
-    name: input.name,
-    type: input.type,
-    identifier: input.identifier ?? null,
-    custom_icon: input.custom_icon ?? null,
-    template_key: input.template_key ?? null,
-  };
-  const { data, error } = await supabase.from('assets').insert(payload).select('*').single();
-  if (error) throw error;
-  return data;
-}
+// Configuration
+const sanitize = (v?: string) => (v && !v.startsWith('@') ? v : undefined);
 
-export async function getAssets() {
-  const { data, error } = await supabase.from('assets').select('*').order('created_at', { ascending: false });
-  if (error) throw error;
-  return data;
-}
+// Get API URL from environment variables or use default
+const envUrl = process.env.EXPO_PUBLIC_API_URL;
+const extraUrl = Constants.expoConfig?.extra?.apiUrl;
+const API_URL = envUrl || extraUrl || 'http://localhost:3001/api';
 
-export async function getAssetDeadlines(assetId: string) {
-  const { data, error } = await supabase
-    .from('deadlines')
-    .select('*')
-    .eq('asset_id', assetId)
-    .order('due_at', { ascending: true });
-
-  if (error) throw error;
-  return data || [];
-}
-
-export async function getAssetDocuments(assetId: string) {
-  const { data, error } = await supabase
-    .from('documents')
-    .select('*')
-    .eq('asset_id', assetId)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return data || [];
-}
-
-export async function deleteAsset(id: string) {
-  const { error } = await supabase.from('assets').delete().eq('id', id);
-  if (error) throw error;
-}
-
-export async function updateAsset(id: string, updates: {
-  type?: string;
-  name?: string;
-  identifier?: string | null;
-  custom_icon?: string | null;
-}) {
-  const { error } = await supabase
-    .from('assets')
-    .update(updates)
-    .eq('id', id);
-
-  if (error) throw error;
-}
-
-// DEADLINES
-export type DeadlineInput = { 
-  title: string; 
-  dueAt: string; 
-  notes?: string; 
-  assetId?: string;
-  isRecurring?: boolean;
-  recurrenceRule?: string;
-};
-
-export async function createDeadline(input: DeadlineInput) {
-  const payload: any = {
-    title: input.title,
-    due_at: input.dueAt,
-    notes: input.notes ?? null,
-    asset_id: input.assetId ?? null,
-  };
-
-  // Aggiungi campi ricorrenza se specificati
-  if (input.isRecurring && input.recurrenceRule) {
-    payload.recurrence_rrule = input.recurrenceRule;
-    payload.base_due_at = input.dueAt;
-  }
-
-  const { data, error } = await supabase.from('deadlines').insert(payload).select('*').single();
-  if (error) throw error;
-  return data;
-}
-
-// Utility per generare RRULE comuni
+// Recurrence templates for deadlines
 export const RECURRENCE_TEMPLATES = {
-  weekly: { label: 'Settimanale', rule: 'RRULE:FREQ=WEEKLY' },
-  monthly: { label: 'Mensile', rule: 'RRULE:FREQ=MONTHLY' },
-  quarterly: { label: 'Trimestrale', rule: 'RRULE:FREQ=MONTHLY;INTERVAL=3' },
-  biannual: { label: 'Semestrale', rule: 'RRULE:FREQ=MONTHLY;INTERVAL=6' },
-  yearly: { label: 'Annuale', rule: 'RRULE:FREQ=YEARLY' },
-  biennial: { label: 'Biennale', rule: 'RRULE:FREQ=YEARLY;INTERVAL=2' },
-} as const;
+  daily: { label: 'Ogni giorno', rule: 'RRULE:FREQ=DAILY' },
+  weekly: { label: 'Ogni settimana', rule: 'RRULE:FREQ=WEEKLY' },
+  monthly: { label: 'Ogni mese', rule: 'RRULE:FREQ=MONTHLY' },
+  quarterly: { label: 'Ogni 3 mesi', rule: 'RRULE:FREQ=MONTHLY;INTERVAL=3' },
+  semiannual: { label: 'Ogni 6 mesi', rule: 'RRULE:FREQ=MONTHLY;INTERVAL=6' },
+  yearly: { label: 'Ogni anno', rule: 'RRULE:FREQ=YEARLY' },
+  biennial: { label: 'Ogni 2 anni', rule: 'RRULE:FREQ=YEARLY;INTERVAL=2' }
+};
 
-export async function getUpcomingDeadlines(days = 90) {
-  const { data, error } = await supabase
-    .from('deadlines')
-    .select('*, asset:assets(name)')
-    .eq('status', 'pending')
-    .gte('due_at', new Date().toISOString())
-    .lte('due_at', new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString())
-    .order('due_at');
-  if (error) throw error;
-  return data;
-}
-
-export async function getAllDeadlines() {
-  const { data, error } = await supabase
-    .from('deadlines')
-    .select('*, asset:assets(name, type, custom_icon)')
-    .order('due_at', { ascending: false });
-  if (error) throw error;
-  return data;
-}
-
-export async function deleteDeadline(id: string) {
-  const { error } = await supabase.from('deadlines').delete().eq('id', id);
-  if (error) throw error;
-}
-
-export async function updateDeadlineStatus(id: string, status: 'pending' | 'done' | 'skipped') {
-  const payload: any = { 
-    status,
-    updated_at: new Date().toISOString()
-  };
-  
-  if (status === 'done') {
-    payload.completed_at = new Date().toISOString();
+// Function to get access token
+export const getAccessToken = async (): Promise<string | null> => {
+  try {
+    const token = await AsyncStorage.getItem('access_token');
+    return token;
+  } catch (error) {
+    console.error('Error retrieving access token:', error);
+    return null;
   }
-  
-  const { data, error } = await supabase
-    .from('deadlines')
-    .update(payload)
-    .eq('id', id)
-    .select()
-    .single();
-    
-  if (error) throw error;
-  return data;
-}
+};
 
-export async function updateDeadline(id: string, input: DeadlineInput) {
-  const payload: any = {
-    title: input.title,
-    due_at: input.dueAt,
-    notes: input.notes ?? null,
-    asset_id: input.assetId ?? null,
-    updated_at: new Date().toISOString()
-  };
-
-  // Gestisci ricorrenza
-  if (input.isRecurring && input.recurrenceRule) {
-    payload.recurrence_rrule = input.recurrenceRule;
-    payload.base_due_at = input.dueAt;
-  } else {
-    // Se non più ricorrente, rimuovi i campi ricorrenza
-    payload.recurrence_rrule = null;
-    payload.base_due_at = null;
+// Function to set access token
+export const setAccessToken = async (token: string) => {
+  try {
+    await AsyncStorage.setItem('access_token', token);
+  } catch (error) {
+    console.error('Error setting access token:', error);
   }
+};
 
-  const { data, error } = await supabase
-    .from('deadlines')
-    .update(payload)
-    .eq('id', id)
-    .select()
-    .single();
-    
-  if (error) throw error;
-  return data;
-}
+// Function to remove access token (logout)
+export const clearAccessToken = async () => {
+  try {
+    await AsyncStorage.removeItem('access_token');
+    await AsyncStorage.removeItem('refresh_token');
+  } catch (error) {
+    console.error('Error removing access token:', error);
+  }
+};
 
-// DOCUMENTS
-export type DocumentInput = { title: string; tags?: string; assetId?: string; storagePath?: string };
-export async function createDocument(input: DocumentInput) {
-  const payload: any = {
-    title: input.title,
-    tags: input.tags ? input.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
-    asset_id: input.assetId ?? null,
-    storage_path: input.storagePath ?? null,
-  };
-  const { data, error } = await supabase.from('documents').insert(payload).select('*').single();
-  if (error) throw error;
-  return data;
-}
-
-export async function getDocuments() {
-  const { data, error } = await supabase
-    .from('documents')
-    .select('*, asset:assets(name, type, custom_icon)')
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return data;
-}
-
-export async function searchDocuments(query: string) {
-  const { data, error } = await supabase
-    .from('documents')
-    .select('*')
-    .or(`title.ilike.%${query}%, tags.cs.{${query}}`)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  return data;
-}
-
-export async function deleteDocument(id: string) {
-  const { error } = await supabase.from('documents').delete().eq('id', id);
-  if (error) throw error;
-}
-
-export async function uploadDocumentFile(fileUri: string, fileName: string, mimeType: string) {
-  console.log('📤 UPLOAD START:', { fileUri, fileName, mimeType });
+// Funzione per gestire le chiamate API con gestione errori di connessione
+async function apiCall(endpoint: string, options: RequestInit = {}) {
+  const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
+  const url = `${baseUrl}${endpoint}`;
   
-  const user = (await supabase.auth.getUser()).data.user;
-  if (!user) throw new Error('Utente non autenticato');
-  
-  console.log('📤 User authenticated:', user.id);
-  
-  const path = `${user.id}/${Date.now()}-${fileName}`;
-  console.log('📤 Upload path:', path);
+  console.log('API call to:', url);
+  console.log('API call options:', options);
   
   try {
-    // METODO 1: FileSystem + Uint8Array (più robusto)
-    console.log('📤 Reading file as base64...');
-    const base64 = await FileSystem.readAsStringAsync(fileUri, { 
-      encoding: FileSystem.EncodingType.Base64 
-    });
+    const accessToken = await getAccessToken();
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...options.headers as Record<string, string>
+    };
     
-    console.log('📤 Base64 length:', base64.length);
-    
-    // Converti base64 in Uint8Array usando helper function
-    const bytes = base64ToUint8Array(base64);
-    
-    console.log('📤 Uint8Array created:', {
-      size: bytes.length,
-      type: mimeType
-    });
-    
-    if (bytes.length === 0) {
-      throw new Error('File is empty (0 bytes)');
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
     }
-    
-    console.log('📤 Uploading to Supabase Storage (Uint8Array)...');
-    const { data, error } = await supabase.storage
-      .from('documents')
-      .upload(path, bytes, { 
-        contentType: mimeType, 
-        upsert: true
-      });
+
+    console.log('API call headers:', headers);
+
+    const response = await fetch(url, {
+      ...options,
+      headers
+    });
+
+    console.log('API response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`API call failed: ${response.status} - ${errorText}`);
       
-    if (error) {
-      console.error('📤 Uint8Array upload failed, trying FormData fallback...', error);
-      
-      // METODO 2: FormData fallback (React Native style)
-      const file = { 
-        uri: fileUri, 
-        name: fileName, 
-        type: mimeType 
-      } as any;
-      
-      console.log('📤 Trying FormData upload...');
-      const result2 = await supabase.storage
-        .from('documents')
-        .upload(`${path}-fd`, file, { 
-          contentType: mimeType, 
-          upsert: true
-        });
-        
-      if (result2.error) {
-        console.error('📤 FormData upload also failed:', result2.error);
-        throw result2.error;
+      // Gestione specifica per errori di autenticazione
+      if (response.status === 401) {
+        // Rimuovi il token scaduto
+        await clearAccessToken();
+        throw new Error('Sessione scaduta. Effettua nuovamente il login.');
       }
       
-      console.log('📤 FormData upload success:', result2.data);
-      return `${path}-fd`;
+      // Gestione specifica per errori di connessione
+      if (response.status === 0 || response.status === 500) {
+        throw new Error('Impossibile connettersi al server. Verifica la tua connessione internet o riprova più tardi.');
+      }
+      
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error: any) {
+    console.error('API call error details:', error);
+    
+    // Gestione errori di rete
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error('Errore di connessione. Verifica la tua connessione internet e che il server sia attivo.');
     }
     
-    console.log('📤 Upload success:', data);
-    return path;
+    // Gestione errori di timeout
+    if (error.name === 'AbortError') {
+      throw new Error('Timeout della richiesta. Il server potrebbe essere sovraccarico, riprova più tardi.');
+    }
     
-  } catch (e: any) {
-    console.error('📤 Upload failed:', e);
-    throw e;
+    // Rilancia l'errore originale se è già un errore personalizzato
+    if (error.message.includes('Sessione scaduta') || 
+        error.message.includes('Impossibile connettersi') || 
+        error.message.includes('Errore di connessione') || 
+        error.message.includes('Timeout')) {
+      throw error;
+    }
+    
+    // Per altri errori, mostra un messaggio generico
+    throw new Error('Errore di connessione al server. Verifica la tua connessione internet.');
   }
 }
 
-export async function createDocumentWithDeadline(documentInput: DocumentInput, deadlineInput?: DeadlineInput) {
-  // Prima crea il documento
-  const document = await createDocument(documentInput);
-  
-  // Se c'è una scadenza da creare, creala e collegala al documento
-  if (deadlineInput) {
-    await createDeadline({
-      ...deadlineInput,
-      assetId: documentInput.assetId // Usa lo stesso asset del documento
-    });
-  }
-  
-  return document;
-}
-
-export async function createDocumentWithAssociations(input: {
-  title: string;
-  tags?: string;
-  assetId?: string;
-  storagePath?: string;
-  fileInfo?: {
-    uri: string;
-    name: string;
-    type: string;
-  };
-  filesInfo?: Array<{
-    uri: string;
-    name: string;
-    type: string;
-  }>;
-  associatedDeadline?: {
-    title: string;
-    dueAt: string;
-    notes?: string;
-    isRecurring?: boolean;
-    recurrenceRule?: string;
-  };
-}) {
-  let assetId = input.assetId;
-  let storagePath = input.storagePath;
-
-  // 1. Carica i file se presenti (supporta sia fileInfo che filesInfo)
-  const filesToUpload = input.filesInfo || (input.fileInfo ? [input.fileInfo] : []);
-  
-  if (filesToUpload.length > 0) {
+// Authentication API that mirrors the Rails/Cognito backend
+export const auth = {
+  // User registration
+  signUp: async (email: string, password: string, firstName?: string, lastName?: string) => {
     try {
-      const uploadPromises = filesToUpload.map(async (fileInfo) => {
-        const fileArrayBuffer = await FileSystem.readAsStringAsync(fileInfo.uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-        const uint8Array = new Uint8Array(
-          atob(fileArrayBuffer)
-            .split('')
-            .map(char => char.charCodeAt(0))
-        );
-
-        const { data: user } = await supabase.auth.getUser();
-        if (!user.user) throw new Error('User not authenticated');
-
-        const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${fileInfo.name}`;
-        const filePath = `${user.user.id}/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('documents')
-          .upload(filePath, uint8Array, {
-            contentType: fileInfo.type,
-            upsert: true
-          });
-
-        if (uploadError) throw uploadError;
-        return filePath;
+      const result = await apiCall('/auth/signup', {
+        method: 'POST',
+        body: JSON.stringify({ 
+          email: {
+            email,
+            password,
+            options: {
+              data: {
+                first_name: firstName,
+                last_name: lastName,
+                full_name: `${firstName} ${lastName}`
+              }
+            }
+          }
+        })
       });
-
-      const uploadedPaths = await Promise.all(uploadPromises);
       
-      // Salva file multipli come JSON array, singolo file come stringa
-      if (uploadedPaths.length > 1) {
-        storagePath = JSON.stringify(uploadedPaths);
-      } else if (uploadedPaths.length === 1) {
-        storagePath = uploadedPaths[0];
+      return { data: { user: { email } }, error: null };
+    } catch (error: any) {
+      return { data: { user: null }, error: { message: error.message } };
+    }
+  },
+
+  // User login
+  signIn: async (email: string, password: string) => {
+    try {
+      const result = await apiCall('/auth/signin', {
+        method: 'POST',
+        body: JSON.stringify({ 
+          email: {
+            email,
+            password,
+            options: {}
+          }
+        })
+      });
+      
+      await setAccessToken(result.access_token);
+      await AsyncStorage.setItem('refresh_token', result.refresh_token);
+      
+      return { data: { user: result.user }, error: null };
+    } catch (error: any) {
+      return { data: { user: null }, error: { message: error.message } };
+    }
+  },
+
+  // Login with object format (for compatibility)
+  signInWithPassword: 
+  async ({ email, password }: { email: string; password: string }) => {
+    return auth.signIn(email, password);
+  },
+
+  // Email confirmation (for registration)
+  confirmSignUp: async (email: string, confirmationCode: string) => {
+    try {
+      const result = await apiCall('/auth/confirm_signup', {
+        method: 'POST',
+        body: JSON.stringify({ 
+          email: {
+            email,
+            confirmation_code: confirmationCode
+          }
+        })
+      });
+      
+      return { data: result, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  },
+
+  // OTP verification for email confirmation (for compatibility)
+  verifyOtp: async ({ email, token, type }: { email: string; token: string; type: string }) => {
+    if (type === 'signup') {
+      return auth.confirmSignUp(email, token);
+    }
+    // For other OTP types (recovery, etc.) implement in the future
+    throw new Error('OTP type not supported yet');
+  },
+
+  // Reset password (placeholder for now)
+  resetPasswordForEmail: async (email: string) => {
+    try {
+      // For now return success without doing anything
+      // In the future we might implement password reset with Cognito
+      return { data: {}, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  },
+
+  // Update user
+  updateUser: async (attributes: any) => {
+    try {
+      const result = await apiCall('/users/profile', {
+        method: 'PUT',
+        body: JSON.stringify(attributes)
+      });
+      
+      return { data: { user: result }, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  },
+
+  // Logout
+  signOut: async () => {
+    try {
+      await apiCall('/auth/signout', {
+        method: 'POST'
+      });
+    } catch (error) {
+      console.error('Error during logout:', error);
+    } finally {
+      await clearAccessToken();
+    }
+    return { error: null };
+  },
+
+  // Refresh token
+  refreshToken: async () => {
+    try {
+      const refreshToken = await AsyncStorage.getItem('refresh_token');
+      if (!refreshToken) {
+        throw new Error('No refresh token available');
+      }
+
+      const result = await apiCall('/auth/refresh', {
+        method: 'POST',
+        body: JSON.stringify({ refresh_token: refreshToken })
+      });
+      
+      await setAccessToken(result.access_token);
+      return { data: { user: result.user }, error: null };
+    } catch (error: any) {
+      return { data: { user: null }, error: { message: error.message } };
+    }
+  },
+
+  // Get current user
+  getUser: async () => {
+    const accessToken = await getAccessToken();
+    if (!accessToken) return { data: { user: null }, error: null };
+    
+    // Temporarily return user data from token without making API call
+    // In the future, we'll implement a proper /users/me endpoint
+    return {
+      data: { 
+        user: { 
+          id: 'temp-user-id',
+          email: 'test3@example.com' // This should come from the token in the future
+        } 
+      }, 
+      error: null 
+    };
+  }
+};
+
+// API for CRUD operations on data
+export const from = (table: string) => {
+  return {
+    select: (columns?: string) => {
+      return {
+        eq: (column: string, value: any) => ({
+          async then(resolve: Function) {
+            try {
+              const params = new URLSearchParams();
+              params.append(column, value);
+              
+              const data = await apiCall(`/${table}?${params.toString()}`);
+              resolve({ data: Array.isArray(data) ? data : [data], error: null });
+            } catch (error: any) {
+              resolve({ data: null, error: { message: error.message } });
+            }
+          },
+          
+          single: () => ({
+            async then(resolve: Function) {
+              try {
+                const params = new URLSearchParams();
+                params.append(column, value);
+                
+                const data = await apiCall(`/${table}?${params.toString()}`);
+                resolve({ data: Array.isArray(data) ? data[0] || null : data, error: null });
+              } catch (error: any) {
+                resolve({ data: null, error: { message: error.message } });
+              }
+            }
+          })
+        }),
+        
+        async then(resolve: Function) {
+          try {
+            const data = await apiCall(`/${table}`);
+            resolve({ data: Array.isArray(data) ? data : [data], error: null });
+          } catch (error: any) {
+            resolve({ data: null, error: { message: error.message } });
+          }
+        },
+        
+        order: (column: string) => ({
+          async then(resolve: Function) {
+            try {
+              const params = new URLSearchParams();
+              params.append('order_by', column);
+              
+              const data = await apiCall(`/${table}?${params.toString()}`);
+              resolve({ data: Array.isArray(data) ? data : [data], error: null });
+            } catch (error: any) {
+              resolve({ data: null, error: { message: error.message } });
+            }
+          }
+        })
+      };
+    },
+    
+    insert: (data: any) => ({
+      async then(resolve: Function) {
+        try {
+          const result = await apiCall(`/${table}`, {
+            method: 'POST',
+            body: JSON.stringify(data)
+          });
+          
+          resolve({ data: result, error: null });
+        } catch (error: any) {
+          resolve({ data: null, error: { message: error.message } });
+        }
+      }
+    }),
+    
+    update: (data: any) => ({
+      eq: (column: string, value: any) => ({
+        async then(resolve: Function) {
+          try {
+            const result = await apiCall(`/${table}/${column}/${value}`, {
+              method: 'PUT',
+              body: JSON.stringify(data)
+            });
+            
+            resolve({ data: result, error: null });
+          } catch (error: any) {
+            resolve({ data: null, error: { message: error.message } });
+          }
+        }
+      })
+    }),
+    
+    delete: () => ({
+      eq: (column: string, value: any) => ({
+        async then(resolve: Function) {
+          try {
+            const result = await apiCall(`/${table}/${column}/${value}`, {
+              method: 'DELETE'
+            });
+            
+            resolve({ data: result, error: null });
+          } catch (error: any) {
+            resolve({ data: null, error: { message: error.message } });
+          }
+        }
+      })
+    })
+  };
+};
+
+// Export everything as 'api' for the existing code
+export const api = {
+  auth,
+  from
+};
+
+// Legacy export for backward compatibility
+export const supabase = api;
+
+// CRUD functions for deadlines
+export const getAllDeadlines = async () => {
+  try {
+    const data = await apiCall('/deadlines');
+    return data;
+  } catch (error: any) {
+    console.error('Error fetching deadlines:', error);
+    throw error;
+  }
+};
+
+export const getDeadline = async (id: string) => {
+  try {
+    const data = await apiCall(`/deadlines/${id}`);
+    return data;
+  } catch (error: any) {
+    console.error('Error fetching deadline:', error);
+    throw error;
+  }
+};
+
+export const createDeadline = async (deadlineData: any) => {
+  try {
+    const result = await apiCall('/deadlines', {
+      method: 'POST',
+      body: JSON.stringify({ deadline: deadlineData })
+    });
+    return result;
+  } catch (error: any) {
+    console.error('Error creating deadline:', error);
+    throw error;
+  }
+};
+
+export const createDeadlineWithAssociations = async (deadlineData: any) => {
+  try {
+    const result = await apiCall('/deadlines', {
+      method: 'POST',
+      body: JSON.stringify({ deadline: deadlineData })
+    });
+    return result;
+  } catch (error: any) {
+    console.error('Error creating deadline:', error);
+    throw error;
+  }
+};
+
+export const updateDeadlineStatus = async (id: string, status: string) => {
+  try {
+    let endpoint: string;
+    if (status === 'done') {
+      endpoint = `/deadlines/${id}/complete`;
+    } else if (status === 'pending') {
+      endpoint = `/deadlines/${id}/reopen`;
+    } else {
+      endpoint = `/deadlines/${id}`;
+    }
+    
+    const result = await apiCall(endpoint, {
+      method: 'PUT',
+      body: status === 'done' || status === 'pending' ? '{}' : JSON.stringify({ deadline: { status } })
+    });
+    return result;
+  } catch (error: any) {
+    console.error('Error updating deadline status:', error);
+    throw error;
+  }
+};
+
+export const deleteDeadline = async (id: string) => {
+  try {
+    const result = await apiCall(`/deadlines/${id}`, {
+      method: 'DELETE'
+    });
+    return result;
+  } catch (error: any) {
+    console.error('Error deleting deadline:', error);
+    throw error;
+  }
+};
+
+// CRUD functions for assets
+export const getAssets = async () => {
+  try {
+    const data = await apiCall('/assets');
+    return data;
+  } catch (error: any) {
+    console.error('Error fetching assets:', error);
+    throw error;
+  }
+};
+
+export const getAsset = async (id: string) => {
+  try {
+    const data = await apiCall(`/assets/${id}`);
+    return data;
+  } catch (error: any) {
+    console.error('Error fetching asset:', error);
+    throw error;
+  }
+};
+
+export const createAsset = async (assetData: any) => {
+  try {
+    console.log('Frontend sending asset data:', assetData);
+    const result = await apiCall('/assets', {
+      method: 'POST',
+      body: JSON.stringify({ asset: assetData })
+    });
+    return result;
+  } catch (error: any) {
+    console.error('Error creating asset:', error);
+    throw error;
+  }
+};
+
+export const updateAsset = async (id: string, assetData: any) => {
+  try {
+    const result = await apiCall(`/assets/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ asset: assetData })
+    });
+    return result;
+  } catch (error: any) {
+    console.error('Error updating asset:', error);
+    throw error;
+  }
+};
+
+export const deleteAsset = async (id: string) => {
+  try {
+    const result = await apiCall(`/assets/${id}`, {
+      method: 'DELETE'
+    });
+    return result;
+  } catch (error: any) {
+    console.error('Error deleting asset:', error);
+    throw error;
+  }
+};
+
+// Asset-related functions
+export const getAssetDeadlines = async (assetId: string) => {
+  try {
+    const data = await apiCall(`/assets/${assetId}/deadlines`);
+    return data;
+  } catch (error: any) {
+    console.error('Error fetching asset deadlines:', error);
+    throw error;
+  }
+};
+
+export const getAssetDocuments = async (assetId: string) => {
+  try {
+    const data = await apiCall(`/assets/${assetId}/documents`);
+    return data;
+  } catch (error: any) {
+    console.error('Error fetching asset documents:', error);
+    throw error;
+  }
+};
+
+// CRUD functions for documents
+export const getDocuments = async () => {
+  try {
+    const data = await apiCall('/documents');
+    return data;
+  } catch (error: any) {
+    console.error('Error fetching documents:', error);
+    throw error;
+  }
+};
+
+export const getDocument = async (id: string) => {
+  try {
+    const data = await apiCall(`/documents/${id}`);
+    return data;
+  } catch (error: any) {
+    console.error('Error fetching document:', error);
+    throw error;
+  }
+};
+
+export const createDocument = async (documentData: FormData | any) => {
+  try {
+    const accessToken = await getAccessToken();
+    const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.59:3001/api';
+    const url = `${baseUrl}/documents`;
+    
+    let body: FormData;
+    
+    // Se è già un FormData, usalo direttamente
+    if (documentData instanceof FormData) {
+      body = documentData;
+    } else {
+      // Altrimenti, crea FormData dall'oggetto
+      const formData = new FormData();
+      formData.append('title', documentData.title);
+      if (documentData.tags) {
+        formData.append('tags', documentData.tags);
+      }
+      if (documentData.assetId) {
+        formData.append('asset_id', documentData.assetId);
       }
       
-    } catch (error) {
-      console.error('Error uploading files:', error);
-      throw new Error('Errore durante l\'upload dei file');
+      // Aggiungi i file
+      const filesToUpload = documentData.filesInfo || (documentData.fileInfo ? [documentData.fileInfo] : []);
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
+        
+        // Crea l'oggetto file per FormData
+        const fileData = {
+          uri: file.uri,
+          name: file.name,
+          type: file.type
+        } as any;
+        
+        console.log('🔍 DEBUG - Appending file to FormData:', fileData);
+        formData.append('files[]', fileData);
+      }
+      
+      body = formData;
     }
-  }
 
-  // 3. Crea il documento
-  const document = await createDocument({
-    title: input.title,
-    tags: input.tags,
-    assetId,
-    storagePath
-  });
+    console.log('🔍 DEBUG - Sending FormData to:', url);
 
-  // 4. Crea la scadenza associata se richiesta
-  if (input.associatedDeadline) {
-    await createDeadline({
-      title: input.associatedDeadline.title,
-      dueAt: input.associatedDeadline.dueAt,
-      notes: input.associatedDeadline.notes,
-      assetId, // Usa lo stesso asset del documento
-      isRecurring: input.associatedDeadline.isRecurring,
-      recurrenceRule: input.associatedDeadline.recurrenceRule
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: body
     });
-  }
 
-  return document;
-}
-
-export async function createDeadlineWithAssociations(input: {
-  title: string;
-  dueAt: string;
-  notes?: string;
-  assetId?: string;
-  isRecurring?: boolean;
-  recurrenceRule?: string;
-  selectedAssets?: any[];
-  selectedDocuments?: any[];
-
-  associatedDocument?: {
-    title: string;
-    tags?: string;
-  } | { existingDocumentId: string };
-}) {
-  let assetId = input.assetId;
-
-  // 1. Crea la scadenza
-  const deadline = await createDeadline({
-    title: input.title,
-    dueAt: input.dueAt,
-    notes: input.notes,
-    assetId,
-    isRecurring: input.isRecurring,
-    recurrenceRule: input.recurrenceRule
-  });
-
-  // 3. Collega i beni selezionati
-  if (input.selectedAssets && input.selectedAssets.length > 0) {
-    const assetAssociations = input.selectedAssets.map(asset => ({
-      deadline_id: deadline.id,
-      asset_id: asset.id
-    }));
-    
-    const { error: assetError } = await supabase
-      .from('deadline_assets')
-      .insert(assetAssociations);
-    
-    if (assetError) throw assetError;
-  }
-
-  // 4. Collega i documenti selezionati
-  if (input.selectedDocuments && input.selectedDocuments.length > 0) {
-    const documentAssociations = input.selectedDocuments.map(document => ({
-      deadline_id: deadline.id,
-      document_id: document.id
-    }));
-    
-    const { error: documentError } = await supabase
-      .from('deadline_documents')
-      .insert(documentAssociations);
-    
-    if (documentError) throw documentError;
-  }
-
-  // 5. Crea o collega il documento se richiesto (per retrocompatibilità)
-  if (input.associatedDocument) {
-    if ('existingDocumentId' in input.associatedDocument) {
-      // Documento esistente - non facciamo nulla qui, il collegamento è implicito attraverso l'asset
-    } else {
-      // Crea nuovo documento
-      await createDocument({
-        title: input.associatedDocument.title,
-        tags: input.associatedDocument.tags,
-        assetId // Usa lo stesso asset della scadenza
-      });
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText);
     }
-  }
 
-  return deadline;
-}
-
-// Helper function for base64 decode (React Native compatible)
-function base64ToUint8Array(base64: string): Uint8Array {
-  // Decodifica base64 compatibile con React Native
-  const binaryString = atob(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  
-  for (let i = 0; i < len; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
+    return await response.json();
+  } catch (error: any) {
+    console.error('Error creating document:', error);
+    throw error;
   }
-  
-  return bytes;
-}
+};
 
-// Implementazione atob per React Native (se non disponibile)
-function atob(base64: string): string {
-  // React Native ha atob nativo, ma per sicurezza implementiamo manualmente
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-  let result = '';
-  let i = 0;
-  
-  base64 = base64.replace(/[^A-Za-z0-9+/]/g, '');
-  
-  while (i < base64.length) {
-    const a = chars.indexOf(base64.charAt(i++));
-    const b = chars.indexOf(base64.charAt(i++));
-    const c = chars.indexOf(base64.charAt(i++));
-    const d = chars.indexOf(base64.charAt(i++));
-    
-    const bitmap = (a << 18) | (b << 12) | (c << 6) | d;
-    
-    result += String.fromCharCode((bitmap >> 16) & 255);
-    if (c !== 64) result += String.fromCharCode((bitmap >> 8) & 255);
-    if (d !== 64) result += String.fromCharCode(bitmap & 255);
+export const updateDocument = async (id: string, documentData: any) => {
+  try {
+    const result = await apiCall(`/documents/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(documentData)
+    });
+    return result;
+  } catch (error: any) {
+    console.error('Error updating document:', error);
+    throw error;
   }
-  
-  return result;
-} 
+};
+
+export const deleteDocument = async (id: string) => {
+  try {
+    const result = await apiCall(`/documents/${id}`, {
+      method: 'DELETE'
+    });
+    return result;
+  } catch (error: any) {
+    console.error('Error deleting document:', error);
+    throw error;
+  }
+};
+
+// Asset categories and types functions
+export const getAssetCategories = async () => {
+  try {
+    const data = await apiCall('/asset_categories');
+    return data;
+  } catch (error: any) {
+    console.error('Error fetching asset categories:', error);
+    throw error;
+  }
+};
+
+export const getAssetTypes = async () => {
+  try {
+    const data = await apiCall('/asset_types');
+    return data;
+  } catch (error: any) {
+    console.error('Error fetching asset types:', error);
+    throw error;
+  }
+};
+
+export const getAssetTypesByCategory = async (categoryId: string) => {
+  try {
+    const data = await apiCall(`/asset_types/by_category/${categoryId}`);
+    return data;
+  } catch (error: any) {
+    console.error('Error fetching asset types by category:', error);
+    throw error;
+  }
+};

@@ -21,7 +21,7 @@
 - **Preview integrata**: Visualizzazione diretta nell'app
 - **Tag intelligenti**: Organizzazione tramite etichette personalizzate
 - **Condivisione facile**: Scarica e condividi i tuoi documenti
-- **Storage sicuro**: Archiviazione crittografata su Supabase
+- **Storage sicuro**: Archiviazione crittografata su AWS S3
 
 ### 🔗 Associazioni Avanzate
 - **Collegamenti bidirezionali**: Documenti ↔ Scadenze, Beni → Scadenze/Documenti
@@ -39,10 +39,10 @@
 - **Ionicons** per iconografia coerente
 
 ### Backend
-- **Supabase** come Backend-as-a-Service
-- **PostgreSQL** con Row Level Security (RLS)
-- **Supabase Storage** per file management
-- **Edge Functions** per logica server-side
+- **Ruby on Rails** API
+- **PostgreSQL** database
+- **AWS Cognito** per autenticazione
+- **AWS S3** per file storage
 
 ### Funzionalità Avanzate
 - **Ricorrenze RRULE**: Standard per eventi ricorrenti
@@ -55,7 +55,9 @@
 ### Prerequisiti
 - Node.js 18+
 - Expo CLI
-- Account Supabase
+- Ruby 3.2+
+- PostgreSQL
+- Account AWS
 
 ### Setup del Progetto
 ```bash
@@ -63,24 +65,27 @@
 git clone https://github.com/tuo-username/pratico.git
 cd pratico
 
-# Installa le dipendenze
+# Installa le dipendenze frontend
 npm install
 
 # Configura le variabili d'ambiente
 cp .env.example .env
-# Modifica .env con le tue chiavi Supabase
+# Modifica .env con le tue chiavi AWS
 ```
 
-### Configurazione Supabase
+### Setup Backend Rails
 ```bash
-# Avvia Supabase CLI (sviluppo locale)
-npx supabase start
+# Vai nella directory del backend
+cd ../pratico-backend
 
-# Applica le migrazioni
-npx supabase db reset
+# Installa le dipendenze Ruby
+bundle install
 
-# Genera i tipi TypeScript
-npm run generate-types
+# Configura il database
+# Crea il file .env con le variabili d'ambiente
+
+# Avvia il server Rails
+rails server -p 3001
 ```
 
 ### Avvio dell'App
@@ -98,7 +103,7 @@ npm run android
 ## 📱 Struttura del Progetto
 
 ```
-pratico/
+pratico/                    # Frontend React Native
 ├── app/                    # Expo Router pages
 │   ├── (auth)/            # Pagine di autenticazione
 │   ├── (tabs)/            # Tab navigation
@@ -108,27 +113,31 @@ pratico/
 │   └── FAB.tsx           # Floating Action Button
 ├── lib/                  # Logica business
 │   ├── api.ts           # API calls e utilità
-│   ├── supabase.ts      # Configurazione Supabase
 │   └── types.ts         # Definizioni TypeScript
-├── supabase/            # Configurazione backend
-│   ├── migrations/      # SQL migrations
-│   └── functions/       # Edge Functions
 └── assets/              # Risorse statiche
+
+pratico-backend/          # Backend Rails
+├── app/                 # Controllers, Models, Services
+├── config/              # Configurazione Rails
+└── db/                  # Migrazioni database
 ```
 
 ## 🗄 Schema Database
 
 ### Tabelle Principali
+- **`users`**: Utenti del sistema
+- **`user_profiles`**: Profili utente estesi
 - **`assets`**: Beni dell'utente (auto, case, altro)
 - **`deadlines`**: Scadenze con supporto ricorrenze
 - **`documents`**: Documenti con metadata e storage
-- **`user_profiles`**: Profili utente estesi
+- **`deadline_assets`**: Associazione scadenze-beni
+- **`deadline_documents`**: Associazione scadenze-documenti
 
 ### Funzionalità Database
-- **RLS attivo**: Isolamento dati per utente
+- **Autenticazione Cognito**: Gestione utenti sicura
 - **Trigger automatici**: Gestione ricorrenze
 - **Storage policies**: Accesso sicuro ai file
-- **Funzioni SQL**: Logica business nel database
+- **API REST**: Endpoint per tutte le operazioni
 
 ## 🎨 Design System
 
@@ -148,8 +157,8 @@ pratico/
 
 ## 🔒 Sicurezza
 
-- **Autenticazione robusta**: JWT con refresh token
-- **Isolamento dati**: RLS per privacy totale
+- **Autenticazione AWS Cognito**: JWT con refresh token
+- **Isolamento dati**: Filtri per utente
 - **Storage sicuro**: Crittografia file automatica
 - **Validazione input**: Sanitizzazione dati
 - **Gestione errori**: Logging e recovery
@@ -157,12 +166,15 @@ pratico/
 ## 📊 Funzionalità in Evidenza
 
 ### Sistema di Ricorrenze
-```sql
--- Trigger automatico per scadenze ricorrenti
-CREATE OR REPLACE FUNCTION fn_next_due_at(rrule text, due_at timestamptz)
-RETURNS timestamptz AS $$
--- Logica di calcolo della prossima scadenza
-$$ LANGUAGE plpgsql;
+```ruby
+# Controller Rails per gestione scadenze ricorrenti
+class Api::DeadlinesController < ApplicationController
+  def create
+    deadline = current_user.deadlines.build(deadline_params)
+    deadline.calculate_next_due_at if deadline.recurrence.present?
+    deadline.save
+  end
+end
 ```
 
 ### Upload Intelligente

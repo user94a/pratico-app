@@ -1,6 +1,6 @@
 import { deleteDocument } from '@/lib/api';
 import { getAssetIcon } from '@/lib/assetIcons';
-import { supabase } from '@/lib/supabase';
+import { api } from '@/lib/api';
 import { Document } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
 import * as FileSystem from 'expo-file-system';
@@ -173,7 +173,7 @@ export function DocumentDetailModal({ visible, onClose, document, onAssetPress, 
       try {
         // Carica bene associato
         if (document.asset_id) {
-          const { data: assetData } = await supabase
+          const { data: assetData } = await api
             .from('assets')
             .select('*')
             .eq('id', document.asset_id)
@@ -186,7 +186,7 @@ export function DocumentDetailModal({ visible, onClose, document, onAssetPress, 
 
         // Carica scadenza associata
         if ((document as any).deadline_id) {
-          const { data: deadlineData } = await supabase
+          const { data: deadlineData } = await api
             .from('deadlines')
             .select('*')
             .eq('id', (document as any).deadline_id)
@@ -213,7 +213,7 @@ export function DocumentDetailModal({ visible, onClose, document, onAssetPress, 
 
           // Genera URL per tutti i file
           const files = filePaths.map(path => {
-            const { data } = supabase.storage
+            const { data } = api.storage
               .from('documents')
               .getPublicUrl(path);
             
@@ -318,7 +318,7 @@ export function DocumentDetailModal({ visible, onClose, document, onAssetPress, 
       
       const tags = editTags.trim() ? editTags.split(',').map(tag => tag.trim()).filter(Boolean) : [];
       
-      const { error } = await supabase
+      const { error } = await api
         .from('documents')
         .update({
           title: editTitle.trim(),

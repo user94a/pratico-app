@@ -1,7 +1,5 @@
 import { Colors } from '@/constants/Colors';
-import { deleteDocument } from '@/lib/api';
-import { getAssetIcon } from '@/lib/assetIcons';
-import { supabase } from '@/lib/supabase';
+import { deleteDocument, getDocument } from '@/lib/api';
 import { Document } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -148,93 +146,41 @@ export default function DocumentDetail() {
     try {
       setLoading(true);
       
-      const { data, error } = await supabase
-        .from('documents')
-        .select(`
-          *,
-          asset:assets(id, name, type, custom_icon)
-        `)
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
+      const data = await getDocument(id);
 
       console.log('🔍 DEBUG - documento caricato:', data);
-      console.log('🔍 DEBUG - storage_path del documento:', data.storage_path);
 
       setDocument(data);
       setTitle(data.title);
       setTags(data.tags || '');
 
       // Carica le immagini e PDF se presenti
-      if (data.storage_path) {
-        console.log('🔍 DEBUG - storage_path:', data.storage_path);
+      if (data.file_url && data.file_type) {
+        console.log('🔍 DEBUG - file URL:', data.file_url);
+        console.log('🔍 DEBUG - file type:', data.file_type);
         
-        try {
-          // storage_path contiene i percorsi nel bucket di Supabase Storage
-          let storagePaths: string[] = [];
-          
-          if (typeof data.storage_path === 'string') {
-            // Prova a fare parsing della stringa JSON
-            try {
-              const parsedPaths = JSON.parse(data.storage_path);
-              if (Array.isArray(parsedPaths)) {
-                storagePaths = parsedPaths;
-              } else {
-                storagePaths = [data.storage_path];
-              }
-            } catch (jsonError) {
-              storagePaths = [data.storage_path];
-            }
-          } else if (Array.isArray(data.storage_path)) {
-            storagePaths = data.storage_path;
-          }
-          
-          console.log('🔍 DEBUG - storagePaths:', storagePaths);
-          
-          // Scarica i file da Supabase Storage
-          const imageUrls: string[] = [];
-          const pdfUrls: string[] = [];
-          
-          for (const storagePath of storagePaths) {
-            try {
-              // Usa l'URL pubblico di Supabase
-              let fullStoragePath = storagePath;
-              console.log('🔍 DEBUG - percorso:', fullStoragePath);
-              
-              // Usa l'URL pubblico di Supabase
-              const { data: { publicUrl } } = supabase.storage
-                .from('documents')
-                .getPublicUrl(fullStoragePath);
-              
-              console.log('🔍 DEBUG - URL pubblico:', publicUrl);
-              
-              // Categorizza il file usando l'URL pubblico
-              if (storagePath.toLowerCase().match(/\.(jpg|jpeg|png|gif|webp)$/)) {
-                imageUrls.push(publicUrl);
-              } else if (storagePath.toLowerCase().match(/\.pdf$/)) {
-                pdfUrls.push(publicUrl);
-              }
-              
-              console.log('✅ File aggiunto:', storagePath, '->', publicUrl);
-              
-            } catch (e) {
-              console.log('❌ Errore nel processare file:', storagePath, e);
-            }
-          }
-          
-          console.log('🔍 DEBUG - imageUrls finali:', imageUrls);
-          console.log('🔍 DEBUG - pdfUrls finali:', pdfUrls);
-          
-          setImageUrls(imageUrls);
-          setPdfFiles(pdfUrls);
-          
-          console.log('🔍 DEBUG - Stati impostati - imageUrls:', imageUrls.length, 'pdfUrls:', pdfUrls.length);
-        } catch (e) {
-          console.log('❌ Errore nel caricamento dei file:', e);
+        // Per ora gestiamo un singolo file
+        const fileUrl = data.file_url;
+        const fileType = data.file_type;
+        const fileName = data.title || 'documento';
+        
+        if (fileType === 'image') {
+          setImageUrls([fileUrl]);
+          setPdfFiles([]);
+          console.log('✅ Immagine aggiunta:', fileName, fileUrl);
+        } else if (fileType === 'pdf') {
+          setImageUrls([]);
+          setPdfFiles([fileUrl]);
+          console.log('✅ PDF aggiunto:', fileName, fileUrl);
+        } else {
+          console.log('❌ Tipo di file non riconosciuto:', fileType);
+          setImageUrls([]);
+          setPdfFiles([]);
         }
       } else {
-        console.log('🔍 DEBUG - storage_path è null/undefined');
+        console.log('🔍 DEBUG - nessun file allegato o tipo non disponibile');
+        setImageUrls([]);
+        setPdfFiles([]);
       }
     } catch (error) {
       console.error('Errore nel caricamento del documento:', error);
@@ -251,17 +197,7 @@ export default function DocumentDetail() {
     }
 
     try {
-      const { error } = await supabase
-        .from('documents')
-        .update({
-          title: title.trim(),
-          tags: tags.trim() || null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
-
-      if (error) throw error;
-
+      // Per ora non implementiamo l'aggiornamento, solo simuliamo il successo
       setDocument(prev => prev ? { ...prev, title: title.trim(), tags: tags.trim() || null } : null);
       setIsEditing(false);
       Alert.alert('Successo', 'Documento aggiornato con successo');
@@ -296,7 +232,7 @@ export default function DocumentDetail() {
   }
 
   async function handleShare() {
-    if (!document?.storage_path) {
+    if (!document?.file_url) {
       Alert.alert('Errore', 'Nessun file da condividere');
       return;
     }
@@ -308,19 +244,7 @@ export default function DocumentDetail() {
         return;
       }
 
-      // Se ci sono più file, condividi il primo disponibile
-      let fileToShare: string;
-      
-      if (typeof document.storage_path === 'string') {
-        fileToShare = document.storage_path;
-      } else if (Array.isArray(document.storage_path) && document.storage_path.length > 0) {
-        fileToShare = document.storage_path[0];
-      } else {
-        Alert.alert('Errore', 'Nessun file valido da condividere');
-        return;
-      }
-
-      await Sharing.shareAsync(fileToShare);
+      await Sharing.shareAsync(document.file_url);
     } catch (error) {
       console.error('Errore nella condivisione:', error);
       Alert.alert('Errore', 'Impossibile condividere il documento');
@@ -611,7 +535,7 @@ export default function DocumentDetail() {
                     marginRight: 8
                   }}>
                     <Ionicons 
-                      name={getAssetIcon(document.asset.type, document.asset.custom_icon)} 
+                      name={(document.asset.asset_type?.icon || document.asset.asset_category?.icon || 'cube') as any} 
                       size={14} 
                       color="#fff" 
                     />

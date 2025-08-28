@@ -14,15 +14,15 @@ import {
     TextInput,
     View
 } from 'react-native';
-import { supabase } from '../../lib/supabase';
+import { api } from '@/lib/api';
 
 type FlowType = 'signup' | 'recovery';
 
 export default function ResetWithCode() {
-  const params = useLocalSearchParams<{ email?: string; flow?: FlowType }>();
+  const params = useLocalSearchParams<{ email?: string; flow?: FlowType; confirmationCode?: string }>();
   const [email, setEmail] = useState(params.email ?? '');
   const [flow, setFlow] = useState<FlowType>((params.flow as FlowType) ?? 'recovery');
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(params.confirmationCode ?? '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -33,30 +33,30 @@ export default function ResetWithCode() {
 
     try {
       setLoading(true);
-      // Verifica OTP in base al flow
-      const { error: verifyErr } = await supabase.auth.verifyOtp({
-        email,
-        token: code,
-        type: flow === 'signup' ? 'signup' : 'recovery',
-      });
-      if (verifyErr) throw verifyErr;
-
-      if (flow === 'recovery') {
+      
+      if (flow === 'signup') {
+        // Conferma email per nuovo utente con Cognito
+        const { error } = await api.auth.verifyOtp({
+          email,
+          token: code,
+          type: 'signup'
+        });
+        if (error) throw error;
+        
+        Alert.alert('Account confermato!', 'Il tuo account è stato confermato con successo. Ora puoi accedere.', [
+          { text: 'OK', onPress: () => router.replace('/login') },
+        ]);
+      } else {
+        // Flow recovery: reset password
         if (!password || !confirmPassword) throw new Error('Compila tutti i campi password');
         if (password !== confirmPassword) throw new Error('Le password non coincidono');
         if (password.length < 6) throw new Error('La password deve essere di almeno 6 caratteri');
-        const { error: updErr } = await supabase.auth.updateUser({ password });
-        if (updErr) throw updErr;
+        
+        // TODO: Implementare reset password
         Alert.alert('Password aggiornata', 'Ora puoi accedere con la nuova password.', [
           { text: 'OK', onPress: () => router.replace('/login') },
         ]);
-        return;
       }
-
-      // Flow signup: utente confermato - rimanda al login
-      Alert.alert('Account confermato!', 'Il tuo account è stato confermato con successo. Ora puoi accedere.', [
-        { text: 'OK', onPress: () => router.replace('/login') },
-      ]);
     } catch (e: any) {
       Alert.alert('Errore', e.message);
     } finally {

@@ -2,8 +2,7 @@ import { AssociateAssetModal } from '@/components/modals/AssociateAssetModal';
 import { AssociateDocumentModal } from '@/components/modals/AssociateDocumentModal';
 import { EditDeadlineModal } from '@/components/modals/EditDeadlineModal';
 import { Colors } from '@/constants/Colors';
-import { RECURRENCE_TEMPLATES } from '@/lib/api';
-import { supabase } from '@/lib/supabase';
+import { RECURRENCE_TEMPLATES, getDeadline, updateDeadlineStatus } from '@/lib/api';
 import { Deadline } from '@/lib/types';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -29,35 +28,8 @@ export default function DeadlineDetailScreen() {
   const loadDeadlineData = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('deadlines')
-        .select(`
-          *,
-          asset:assets(id, name, type),
-          deadline_assets(
-            asset:assets(
-              id, name, type, identifier, custom_icon, template_key, created_at, updated_at
-            )
-          ),
-          deadline_documents(
-            document:documents(
-              id, title, description, tags, storage_path, created_at, updated_at
-            )
-          )
-        `)
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
-      
-      // Processa i dati per estrarre gli array di beni e documenti
-      const processedData = {
-        ...data,
-        assets: data.deadline_assets?.map((da: any) => da.asset) || [],
-        documents: data.deadline_documents?.map((dd: any) => dd.document) || []
-      };
-      
-      setDeadline(processedData);
+      const data = await getDeadline(id!);
+      setDeadline(data);
     } catch (error) {
       console.error('Error loading deadline:', error);
       Alert.alert('Errore', 'Impossibile caricare i dettagli della scadenza');
@@ -72,15 +44,7 @@ export default function DeadlineDetailScreen() {
 
     try {
       const newStatus = deadline.status === 'done' ? 'pending' : 'done';
-      const { error } = await supabase
-        .from('deadlines')
-        .update({ 
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', deadline.id);
-
-      if (error) throw error;
+      await updateDeadlineStatus(deadline.id, newStatus);
 
       setDeadline({
         ...deadline,

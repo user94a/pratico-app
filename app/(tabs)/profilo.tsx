@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/Colors';
-import { supabase } from '@/lib/supabase';
+import { api } from '@/lib/api';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -26,12 +26,12 @@ export default function Impostazioni() {
 
   async function loadUserData() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } } = await api.auth.getUser();
       setEmail(user?.email ?? null);
       
       // Carica i dati del profilo utente se esistono
       if (user) {
-        const { data: profile } = await supabase
+        const { data: profile } = await api
           .from('user_profiles')
           .select('nome, cognome')
           .eq('user_id', user.id)
@@ -62,7 +62,7 @@ export default function Impostazioni() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await supabase.auth.signOut();
+              await api.auth.signOut();
               router.replace('/login');
             } catch (error: any) {
               Alert.alert('Errore', error.message);

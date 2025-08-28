@@ -76,7 +76,7 @@ export function NewAddAssetModal({ visible, onClose, onSubmit }: NewAddAssetModa
     try {
       setIsLoading(true);
       const asset = await createAsset({
-        type: selectedCategory,
+        asset_type: selectedCategory,
         name: name.trim(),
         identifier: identifier.trim() || null,
         template_key: selectedTemplate

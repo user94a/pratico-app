@@ -1,31 +1,38 @@
 // app/index.tsx
-import type { Session } from '@supabase/supabase-js';
 import { Redirect } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { View, Text } from 'react-native';
+import { api } from '../lib/api';
+import { router } from 'expo-router';
+import { getAssets } from '../lib/api';
 
 export default function Index() {
-  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | undefined>(undefined);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      console.log('Initial session check:', data.session ? 'authenticated' : 'not authenticated');
-      setSession(data.session ?? null);
-    });
+    const checkAuth = async () => {
+      try {
+        // Fai una vera chiamata API per verificare se il token è valido
+        await getAssets();
+        setIsAuthenticated(true);
+      } catch (error: any) {
+        console.log('Auth check failed:', error);
+        if (error.message.includes('Sessione scaduta')) {
+          setIsAuthenticated(false);
+        } else {
+          // Per altri errori (connessione, ecc.), considera ancora autenticato
+          // ma mostra un messaggio di errore
+          setIsAuthenticated(true);
+        }
+      }
+    };
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, s) => {
-      console.log('Auth state changed:', event, s ? 'authenticated' : 'not authenticated');
-      setSession(s);
-    });
-
-    return () => subscription.unsubscribe();
+    checkAuth();
   }, []);
 
-  console.log('Index render - session state:', session === undefined ? 'loading' : session ? 'authenticated' : 'not authenticated');
+  console.log('Index render - auth state:', isAuthenticated === undefined ? 'loading' : isAuthenticated ? 'authenticated' : 'not authenticated');
 
-  if (session === undefined) return null;
-  if (!session) return <Redirect href="/login" />;
+  if (isAuthenticated === undefined) return null;
+  if (!isAuthenticated) return <Redirect href="/login" />;
   return <Redirect href="/(tabs)/scadenze" />;
 }

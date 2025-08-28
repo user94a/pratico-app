@@ -45,19 +45,46 @@ export function QuickCreateAssetModal({ visible, onClose, onAssetCreated }: Quic
       return Alert.alert('Errore', 'Il nome del bene è richiesto');
     }
 
+    console.log('=== DEBUG ASSET CREATION ===');
+    console.log('Current type state:', type);
+    console.log('Type is defined:', typeof type !== 'undefined');
+    console.log('Type is not null:', type !== null);
+    console.log('Type is not empty:', type !== '');
+
+    // Mappa i tipi del frontend ai tipi del backend
+    const typeMapping: Record<string, string> = {
+      vehicles: 'auto',
+      properties: 'casa',
+      animals: 'altro',
+      people: 'persona',
+      devices: 'altro',
+      subscriptions: 'altro',
+      other: 'altro'
+    };
+
+    const mappedType = typeMapping[type] || 'altro';
+    console.log('Mapped type:', mappedType);
+
+    const assetData = {
+      name: name.trim(),
+      asset_type: mappedType,
+      identifier: identifier.trim() || null,
+      custom_icon: customIcon
+    };
+
+    console.log('Final asset data:', assetData);
+    console.log('Asset type in data:', assetData.asset_type);
+    console.log('=== END DEBUG ===');
+
     try {
       setSaving(true);
-      const newAsset = await createAsset({
-        name: name.trim(),
-        type,
-        identifier: identifier.trim() || undefined,
-        custom_icon: customIcon
-      });
+      const newAsset = await createAsset(assetData);
       
       // Ritorna l'asset creato al parent
       onAssetCreated(newAsset);
       reset();
     } catch (error: any) {
+      console.error('Error in handleSave:', error);
       Alert.alert('Errore', error.message);
     } finally {
       setSaving(false);

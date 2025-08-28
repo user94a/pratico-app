@@ -1,15 +1,21 @@
 import { OnboardingScreen } from '@/components/OnboardingScreen';
 import { Colors } from '@/constants/Colors';
-import { supabase } from '@/lib/supabase';
+import { api } from '@/lib/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import type { Session } from '@supabase/supabase-js';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+// Tipo semplificato per la sessione
+type Session = {
+  user: {
+    id: string;
+    email: string;
+  };
+} | null;
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -23,30 +29,21 @@ export default function RootLayout() {
   const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Prima controlla l'autenticazione
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session ?? null);
+    // Controlla l'autenticazione con il nuovo sistema
+    const checkAuth = async () => {
+      const { data } = await api.auth.getUser();
+      const session = data.user ? { user: data.user } : null;
+      setSession(session);
       
       // Solo se l'utente è autenticato, controlla l'onboarding
-      if (data.session) {
+      if (data.user) {
         checkFirstLaunch();
       } else {
         setShowOnboarding(false); // Non mostrare onboarding se non autenticato
       }
-    });
+    };
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-      
-      // Quando l'utente fa login, controlla l'onboarding
-      if (session && showOnboarding === null) {
-        checkFirstLaunch();
-      } else if (!session) {
-        setShowOnboarding(false);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    checkAuth();
   }, []);
 
   useEffect(() => {

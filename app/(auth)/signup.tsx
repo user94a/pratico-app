@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/Colors';
-import { supabase } from '@/lib/supabase';
+import { api } from '@/lib/api';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -60,7 +60,7 @@ export default function SignUp() {
     try {
       setLoading(true);
       
-      const { error } = await supabase.auth.signUp({
+      const { error } = await api.auth.signUp({
         email: email.trim(),
         password,
         options: {

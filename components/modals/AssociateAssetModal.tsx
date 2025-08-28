@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/Colors';
-import { supabase } from '@/lib/supabase';
+import { api } from '@/lib/api';
 import { Asset } from '@/lib/types';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useEffect, useState } from 'react';
@@ -29,7 +29,7 @@ export function AssociateAssetModal({ visible, deadlineId, onClose, onAssociate 
   const loadAvailableAssets = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data, error } = await api
         .from('assets')
         .select('*')
         .order('name');
@@ -61,7 +61,7 @@ export function AssociateAssetModal({ visible, deadlineId, onClose, onAssociate 
   const handleAssociateAsset = async (asset: Asset) => {
     try {
       setAssociating(true);
-      const { error } = await supabase
+      const { error } = await api
         .from('deadline_assets')
         .insert({
           deadline_id: deadlineId,

@@ -40,7 +40,7 @@ interface AssetDetailModalProps {
   onDocumentPress?: (document: Document) => void;
 }
 
-export function AssetDetailModal({ visible, onClose, asset, onEdit, onDelete, onDeadlinePress, onDocumentPress }: AssetDetailModalProps) {
+export default function AssetDetailModal({ visible, onClose, asset, onEdit, onDelete, onDeadlinePress, onDocumentPress }: AssetDetailModalProps) {
   const [deadlines, setDeadlines] = useState<Deadline[]>([]);
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
