@@ -50,9 +50,22 @@ export default function ResetWithCode() {
         // Flow recovery: reset password
         if (!password || !confirmPassword) throw new Error('Compila tutti i campi password');
         if (password !== confirmPassword) throw new Error('Le password non coincidono');
-        if (password.length < 6) throw new Error('La password deve essere di almeno 6 caratteri');
+        if (password.length < 8) throw new Error('La password deve essere di almeno 8 caratteri');
         
-        // TODO: Implementare reset password
+        // Validazione requisiti Cognito
+        const hasUpperCase = /[A-Z]/.test(password);
+        const hasLowerCase = /[a-z]/.test(password);
+        const hasNumbers = /\d/.test(password);
+        const hasSpecialChar = /[^A-Za-z0-9]/.test(password);
+        
+        if (!hasUpperCase || !hasLowerCase || !hasNumbers || !hasSpecialChar) {
+          throw new Error('La password deve contenere almeno una lettera maiuscola, una minuscola, un numero e un carattere speciale');
+        }
+        
+        // Conferma reset password con Cognito
+        const { error } = await api.auth.confirmForgotPassword(email, code, password);
+        if (error) throw error;
+        
         Alert.alert('Password aggiornata', 'Ora puoi accedere con la nuova password.', [
           { text: 'OK', onPress: () => router.replace('/login') },
         ]);
@@ -185,7 +198,7 @@ export default function ResetWithCode() {
                       Nuova password
                     </Text>
                     <TextInput
-                      placeholder="Almeno 6 caratteri"
+                      placeholder="Almeno 8 caratteri con maiuscole, minuscole, numeri e simboli"
                       secureTextEntry
                       value={password}
                       onChangeText={setPassword}

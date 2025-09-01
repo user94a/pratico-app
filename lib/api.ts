@@ -26,6 +26,23 @@ export const RECURRENCE_TEMPLATES = {
 export const getAccessToken = async (): Promise<string | null> => {
   try {
     const token = await AsyncStorage.getItem('access_token');
+    const tokenExpiry = await AsyncStorage.getItem('token_expiry');
+    
+    // Se il token è scaduto, prova a fare refresh
+    if (token && tokenExpiry) {
+      const expiryTime = new Date(tokenExpiry).getTime();
+      const now = new Date().getTime();
+      
+      // Se il token scade tra meno di 5 minuti, fai refresh
+      if (expiryTime - now < 5 * 60 * 1000) {
+        console.log('Token in scadenza, tentativo di refresh...');
+        const refreshed = await refreshAccessToken();
+        if (refreshed) {
+          return await AsyncStorage.getItem('access_token');
+        }
+      }
+    }
+    
     return token;
   } catch (error) {
     console.error('Error retrieving access token:', error);
@@ -37,6 +54,11 @@ export const getAccessToken = async (): Promise<string | null> => {
 export const setAccessToken = async (token: string) => {
   try {
     await AsyncStorage.setItem('access_token', token);
+    
+    // Calcola e salva la scadenza del token (1 ora di default)
+    const expiryTime = new Date();
+    expiryTime.setHours(expiryTime.getHours() + 1);
+    await AsyncStorage.setItem('token_expiry', expiryTime.toISOString());
   } catch (error) {
     console.error('Error setting access token:', error);
   }
@@ -47,25 +69,72 @@ export const clearAccessToken = async () => {
   try {
     await AsyncStorage.removeItem('access_token');
     await AsyncStorage.removeItem('refresh_token');
+    await AsyncStorage.removeItem('token_expiry');
   } catch (error) {
     console.error('Error removing access token:', error);
   }
 };
 
+// Function to refresh access token
+export const refreshAccessToken = async (): Promise<boolean> => {
+  try {
+    const refreshToken = await AsyncStorage.getItem('refresh_token');
+    if (!refreshToken) {
+      console.log('No refresh token available');
+      return false;
+    }
+
+    const response = await fetch(`${API_URL}/auth/refresh`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refresh_token: refreshToken })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      await setAccessToken(data.access_token);
+      await AsyncStorage.setItem('refresh_token', data.refresh_token);
+      
+      // Calcola e salva la scadenza del token (1 ora di default)
+      const expiryTime = new Date();
+      expiryTime.setHours(expiryTime.getHours() + 1);
+      await AsyncStorage.setItem('token_expiry', expiryTime.toISOString());
+      
+      console.log('Token refreshed successfully');
+      return true;
+    } else {
+      console.log('Failed to refresh token');
+      await clearAccessToken();
+      return false;
+    }
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+    await clearAccessToken();
+    return false;
+  }
+};
+
 // Funzione per gestire le chiamate API con gestione errori di connessione
-async function apiCall(endpoint: string, options: RequestInit = {}) {
+async function apiCall(endpoint: string, options: RequestInit = {}, timeoutMs: number = 30000) {
   const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3001/api';
   const url = `${baseUrl}${endpoint}`;
   
   console.log('API call to:', url);
   console.log('API call options:', options);
+  console.log('API call timeout:', timeoutMs);
   
   try {
     const accessToken = await getAccessToken();
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
       ...options.headers as Record<string, string>
     };
+    
+    // Imposta Content-Type solo se non è FormData
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
     
     if (accessToken) {
       headers['Authorization'] = `Bearer ${accessToken}`;
@@ -73,10 +142,17 @@ async function apiCall(endpoint: string, options: RequestInit = {}) {
 
     console.log('API call headers:', headers);
 
+    // Crea un AbortController per gestire il timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
     const response = await fetch(url, {
       ...options,
-      headers
+      headers,
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     console.log('API response status:', response.status);
 
@@ -111,6 +187,10 @@ async function apiCall(endpoint: string, options: RequestInit = {}) {
     
     // Gestione errori di timeout
     if (error.name === 'AbortError') {
+      // Se è un endpoint di file upload, usa un messaggio più specifico
+      if (endpoint.includes('/documents') || endpoint.includes('/assets')) {
+        throw new Error('Timeout durante il caricamento dei file. I file potrebbero essere troppo grandi o la connessione troppo lenta. Riprova con file più piccoli.');
+      }
       throw new Error('Timeout della richiesta. Il server potrebbe essere sovraccarico, riprova più tardi.');
     }
     
@@ -130,21 +210,14 @@ async function apiCall(endpoint: string, options: RequestInit = {}) {
 // Authentication API that mirrors the Rails/Cognito backend
 export const auth = {
   // User registration
-  signUp: async (email: string, password: string, firstName?: string, lastName?: string) => {
+  signUp: async (email: string, password: string) => {
     try {
       const result = await apiCall('/auth/signup', {
         method: 'POST',
         body: JSON.stringify({ 
           email: {
             email,
-            password,
-            options: {
-              data: {
-                first_name: firstName,
-                last_name: lastName,
-                full_name: `${firstName} ${lastName}`
-              }
-            }
+            password
           }
         })
       });
@@ -163,8 +236,7 @@ export const auth = {
         body: JSON.stringify({ 
           email: {
             email,
-            password,
-            options: {}
+            password
           }
         })
       });
@@ -212,12 +284,33 @@ export const auth = {
     throw new Error('OTP type not supported yet');
   },
 
-  // Reset password (placeholder for now)
+  // Reset password
   resetPasswordForEmail: async (email: string) => {
     try {
-      // For now return success without doing anything
-      // In the future we might implement password reset with Cognito
-      return { data: {}, error: null };
+      const result = await apiCall('/auth/forgot_password', {
+        method: 'POST',
+        body: JSON.stringify({ email })
+      });
+      
+      return { data: result, error: null };
+    } catch (error: any) {
+      return { data: null, error: { message: error.message } };
+    }
+  },
+
+  // Confirm forgot password
+  confirmForgotPassword: async (email: string, confirmationCode: string, newPassword: string) => {
+    try {
+      const result = await apiCall('/auth/confirm_forgot_password', {
+        method: 'POST',
+        body: JSON.stringify({ 
+          email,
+          confirmation_code: confirmationCode,
+          new_password: newPassword
+        })
+      });
+      
+      return { data: result, error: null };
     } catch (error: any) {
       return { data: null, error: { message: error.message } };
     }
@@ -428,6 +521,29 @@ export const getDeadline = async (id: string) => {
   }
 };
 
+export const getUserProfile = async () => {
+  try {
+    const data = await apiCall('/user_profiles');
+    return data;
+  } catch (error: any) {
+    console.error('Error fetching user profile:', error);
+    throw error;
+  }
+};
+
+export const updateUserProfile = async (profileData: { name?: string; surname?: string }) => {
+  try {
+    const data = await apiCall('/users/profile', {
+      method: 'PUT',
+      body: JSON.stringify(profileData)
+    });
+    return data;
+  } catch (error: any) {
+    console.error('Error updating user profile:', error);
+    throw error;
+  }
+};
+
 export const createDeadline = async (deadlineData: any) => {
   try {
     const result = await apiCall('/deadlines', {
@@ -592,10 +708,6 @@ export const getDocument = async (id: string) => {
 
 export const createDocument = async (documentData: FormData | any) => {
   try {
-    const accessToken = await getAccessToken();
-    const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.1.59:3001/api';
-    const url = `${baseUrl}/documents`;
-    
     let body: FormData;
     
     // Se è già un FormData, usalo direttamente
@@ -631,22 +743,15 @@ export const createDocument = async (documentData: FormData | any) => {
       body = formData;
     }
 
-    console.log('🔍 DEBUG - Sending FormData to:', url);
+    console.log('🔍 DEBUG - Sending FormData to documents endpoint');
 
-    const response = await fetch(url, {
+    // Usa apiCall con timeout esteso per file upload (2 minuti)
+    const result = await apiCall('/documents', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`
-      },
       body: body
-    });
+    }, 120000); // 2 minuti di timeout
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText);
-    }
-
-    return await response.json();
+    return result;
   } catch (error: any) {
     console.error('Error creating document:', error);
     throw error;

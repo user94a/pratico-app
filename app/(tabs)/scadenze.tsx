@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, Pressable, Alert, ActivityIndicator, TextInput, RefreshControl } from 'react-native';
+import { View, Text, FlatList, Pressable, Alert, ActivityIndicator, TextInput, RefreshControl, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -165,34 +165,27 @@ export default function Scadenze() {
       <Pressable
         onPress={() => router.push(`/deadline-detail?id=${item.id}`)}
         style={{
-          backgroundColor: '#fff',
-          borderRadius: 12,
-          padding: 16,
-          marginBottom: 8,
           flexDirection: 'row',
           alignItems: 'center',
-          justifyContent: 'space-between',
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
-          elevation: 3
+          paddingVertical: 16,
+          paddingHorizontal: 16,
+          justifyContent: 'space-between'
         }}
       >
         <View style={{ flex: 1 }}>
           <Text style={{
             fontSize: 16,
             fontWeight: '600',
-            color: isCompleted ? '#8E8E93' : '#000000',
+            color: isCompleted ? Colors.light.textSecondary : Colors.light.text,
             textDecorationLine: isCompleted ? 'line-through' : 'none',
-            marginBottom: 4
+            marginBottom: 6
           }}>
             {item.title}
           </Text>
           
           <Text style={{
             fontSize: 14,
-            color: isExpiredItem ? '#FF3B30' : '#666'
+            color: isExpiredItem ? '#FF3B30' : Colors.light.textSecondary
           }}>
             {formatDate(item.due_at)}
           </Text>
@@ -228,40 +221,40 @@ export default function Scadenze() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
-      <View style={{ flex: 1, padding: 16 }}>
+      <View style={{ flex: 1 }}>
         {/* Header */}
         <View style={{ 
           flexDirection: 'row', 
           alignItems: 'center', 
-          justifyContent: 'space-between',
-          marginBottom: 24 
+          justifyContent: 'space-between', 
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 8
         }}>
-          <Text style={{ fontSize: 28, fontWeight: '800' }}>
+          <Text style={{ 
+            fontSize: 32, 
+            fontWeight: '800',
+            color: Colors.light.text
+          }}>
             Scadenze
           </Text>
-          
-          <Pressable
-            onPress={() => setShowAddModal(true)}
+          <Pressable 
+            onPress={() => setShowAddModal(true)} 
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
               backgroundColor: Colors.light.tint,
+              width: 36,
+              height: 36,
+              borderRadius: 18,
               alignItems: 'center',
-              justifyContent: 'center',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.2,
-              shadowRadius: 4,
-              elevation: 4
+              justifyContent: 'center'
             }}
           >
-            <Ionicons name="add" size={24} color="#fff" />
+            <Ionicons name="add" size={20} color="#fff" />
           </Pressable>
         </View>
 
-        {/* Barra di ricerca */}
-        <View style={{ paddingHorizontal: 0, paddingBottom: 8 }}>
+        {/* Search */}
+        <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
           <View style={{
             backgroundColor: '#e5e5ea',
             borderRadius: 10,
@@ -277,7 +270,7 @@ export default function Scadenze() {
               style={{ 
                 flex: 1, 
                 fontSize: 17,
-                color: '#000000',
+                color: Colors.light.text,
                 paddingVertical: 4
               }}
               placeholder="Cerca"
@@ -291,129 +284,174 @@ export default function Scadenze() {
           </View>
         </View>
 
-        {/* Contenuto */}
-        <View style={{ flex: 1 }}>
+        {/* Deadlines List */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 16 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={Colors.light.tint}
+            />
+          }
+        >
           {expiredDeadlines.length === 0 && upcomingDeadlines.length === 0 && completedDeadlines.length === 0 ? (
-            /* Stato vuoto */
             <View style={{ 
               flex: 1, 
-              justifyContent: 'center', 
-              alignItems: 'center',
-              paddingHorizontal: 32
+              alignItems: 'center', 
+              justifyContent: 'center',
+              paddingVertical: 60
             }}>
-              <View style={{
-                width: 80,
-                height: 80,
-                borderRadius: 40,
-                backgroundColor: '#e5e5ea',
-                alignItems: 'center',
-                justifyContent: 'center',
-                marginBottom: 16
+              <Ionicons name="calendar-outline" size={60} color={Colors.light.textSecondary} />
+              <Text style={{ 
+                fontSize: 18, 
+                fontWeight: '600',
+                color: Colors.light.textSecondary,
+                marginTop: 16,
+                textAlign: 'center'
               }}>
-                <Ionicons name="calendar-outline" size={32} color="#999" />
-              </View>
-              <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 8, textAlign: 'center' }}>
-                {searchText ? 'Nessuna scadenza trovata' : 'Nessuna scadenza'}
-              </Text>
-              <Text style={{ fontSize: 16, color: '#666', textAlign: 'center', lineHeight: 24 }}>
-                {searchText ? 'Prova a modificare la ricerca' : 'Inizia ad aggiungere le tue scadenze per tenerle tracciate'}
+                {searchText ? 'Nessuna scadenza trovata' : 'Nessuna scadenza caricata'}
               </Text>
               {!searchText && (
-                <Pressable
-                  onPress={() => setShowAddModal(true)}
-                  style={{
-                    marginTop: 24,
-                    paddingHorizontal: 24,
-                    paddingVertical: 12,
-                    backgroundColor: Colors.light.tint,
-                    borderRadius: 8
-                  }}
-                >
-                  <Text style={{ color: '#fff', fontWeight: '600' }}>
-                    Aggiungi la prima scadenza
-                  </Text>
-                </Pressable>
+                <Text style={{ 
+                  fontSize: 14,
+                  color: Colors.light.textSecondary,
+                  marginTop: 8,
+                  textAlign: 'center'
+                }}>
+                  Tocca + per aggiungere la tua prima scadenza
+                </Text>
               )}
             </View>
           ) : (
-            /* Lista con pull-to-refresh */
-            <FlatList
-              data={[]}
-              renderItem={() => null}
-              ListHeaderComponent={() => (
-                <View>
-                  {/* Sezione Scadute */}
-                  {expiredDeadlines.length > 0 && (
-                    <View style={{ marginBottom: 24 }}>
-                      <Text style={{
-                        fontSize: 20,
-                        fontWeight: '700',
-                        color: '#000000',
-                        marginBottom: 12
-                      }}>
-                        Scadute
-                      </Text>
-                      {expiredDeadlines.map((item) => (
+            <View>
+              {/* Sezione Scadute */}
+              {expiredDeadlines.length > 0 && (
+                <View style={{ marginBottom: 24 }}>
+                  <Text style={{
+                    fontSize: 20,
+                    fontWeight: '700',
+                    color: Colors.light.text,
+                    marginBottom: 12
+                  }}>
+                    Scadute
+                  </Text>
+                  <View style={{
+                    backgroundColor: Colors.light.cardBackground,
+                    borderRadius: 16,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 1,
+                    elevation: 1,
+                    marginBottom: 24
+                  }}>
+                    {expiredDeadlines.map((item, index) => {
+                      const isLast = index === expiredDeadlines.length - 1;
+                      return (
                         <View key={item.id}>
                           {renderDeadline({ item })}
+                          {!isLast && (
+                            <View style={{
+                              height: 0.33,
+                              backgroundColor: Colors.light.border,
+                              marginLeft: 0,
+                              marginRight: 0
+                            }} />
+                          )}
                         </View>
-                      ))}
-                    </View>
-                  )}
-
-                  {/* Sezione Prossime Scadenze */}
-                  {upcomingDeadlines.length > 0 && (
-                    <View style={{ marginBottom: 24 }}>
-                      <Text style={{
-                        fontSize: 20,
-                        fontWeight: '700',
-                        color: '#000000',
-                        marginBottom: 12
-                      }}>
-                        Prossime
-                      </Text>
-                      {upcomingDeadlines.map((item) => (
-                        <View key={item.id}>
-                          {renderDeadline({ item })}
-                        </View>
-                      ))}
-                    </View>
-                  )}
-
-                  {/* Sezione Completate */}
-                  {completedDeadlines.length > 0 && (
-                    <View style={{ marginBottom: 24 }}>
-                      <Text style={{
-                        fontSize: 20,
-                        fontWeight: '700',
-                        color: '#000000',
-                        marginBottom: 12
-                      }}>
-                        Completate
-                      </Text>
-                      {completedDeadlines.map((item) => (
-                        <View key={item.id}>
-                          {renderDeadline({ item })}
-                        </View>
-                      ))}
-                    </View>
-                  )}
+                      );
+                    })}
+                  </View>
                 </View>
               )}
-              keyExtractor={(item) => item.id}
-              showsVerticalScrollIndicator={false}
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={onRefresh}
-                  colors={[Colors.light.tint]}
-                  tintColor={Colors.light.tint}
-                />
-              }
-              contentContainerStyle={{ paddingBottom: 20 }}
-            />
+
+              {/* Sezione Prossime Scadenze */}
+              {upcomingDeadlines.length > 0 && (
+                <View style={{ marginBottom: 24 }}>
+                  <Text style={{
+                    fontSize: 20,
+                    fontWeight: '700',
+                    color: Colors.light.text,
+                    marginBottom: 12
+                  }}>
+                    Prossime
+                  </Text>
+                  <View style={{
+                    backgroundColor: Colors.light.cardBackground,
+                    borderRadius: 16,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 1,
+                    elevation: 1,
+                    marginBottom: 24
+                  }}>
+                    {upcomingDeadlines.map((item, index) => {
+                      const isLast = index === upcomingDeadlines.length - 1;
+                      return (
+                        <View key={item.id}>
+                          {renderDeadline({ item })}
+                          {!isLast && (
+                            <View style={{
+                              height: 0.33,
+                              backgroundColor: Colors.light.border,
+                              marginLeft: 0,
+                              marginRight: 0
+                            }} />
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+
+              {/* Sezione Completate */}
+              {completedDeadlines.length > 0 && (
+                <View style={{ marginBottom: 24 }}>
+                  <Text style={{
+                    fontSize: 20,
+                    fontWeight: '700',
+                    color: Colors.light.text,
+                    marginBottom: 12
+                  }}>
+                    Completate
+                  </Text>
+                  <View style={{
+                    backgroundColor: Colors.light.cardBackground,
+                    borderRadius: 16,
+                    shadowColor: '#000',
+                    shadowOffset: { width: 0, height: 1 },
+                    shadowOpacity: 0.05,
+                    shadowRadius: 1,
+                    elevation: 1,
+                    marginBottom: 24
+                  }}>
+                    {completedDeadlines.map((item, index) => {
+                      const isLast = index === completedDeadlines.length - 1;
+                      return (
+                        <View key={item.id}>
+                          {renderDeadline({ item })}
+                          {!isLast && (
+                            <View style={{
+                              height: 0.33,
+                              backgroundColor: Colors.light.border,
+                              marginLeft: 0,
+                              marginRight: 0
+                            }} />
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              )}
+            </View>
           )}
-        </View>
+        </ScrollView>
       </View>
 
       {/* Modal per aggiungere scadenza */}

@@ -226,7 +226,7 @@ export default function AssetDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <ActivityIndicator size="large" color={Colors.light.tint} />
           <Text style={{ marginTop: 16, color: '#666' }}>Caricamento bene...</Text>
@@ -237,7 +237,7 @@ export default function AssetDetailScreen() {
 
   if (!asset) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <Text style={{ fontSize: 16, color: '#666' }}>
             Bene non trovato
@@ -248,7 +248,7 @@ export default function AssetDetailScreen() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
       {/* Header */}
       <View style={{
         flexDirection: 'row',
@@ -325,7 +325,7 @@ export default function AssetDetailScreen() {
       </View>
 
       <ScrollView 
-        style={{ flex: 1 }} 
+        style={{ flex: 1, backgroundColor: '#f2f2f7' }} 
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ padding: 16 }}
       >

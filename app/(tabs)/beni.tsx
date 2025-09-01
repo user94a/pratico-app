@@ -6,7 +6,7 @@ import { Asset } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useCallback, useState } from 'react';
-import { Alert, FlatList, Pressable, RefreshControl, Text, View, TextInput } from 'react-native';
+import { Alert, FlatList, Pressable, RefreshControl, ScrollView, Text, View, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
@@ -71,18 +71,14 @@ export default function BeniScreen() {
     <Pressable
       onPress={() => handleAssetPress(item)}
       style={{
-        backgroundColor: '#fff',
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 16,
+        justifyContent: 'space-between'
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
         <View style={{
           width: 48,
           height: 48,
@@ -100,21 +96,33 @@ export default function BeniScreen() {
         </View>
         
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 4 }}>
+          <Text style={{
+            fontSize: 16,
+            fontWeight: '600',
+            color: Colors.light.text,
+            marginBottom: 6
+          }}>
             {item.name}
           </Text>
-          <Text style={{ fontSize: 14, color: '#666', marginBottom: 2 }}>
+          <Text style={{
+            fontSize: 14,
+            color: Colors.light.textSecondary,
+            marginBottom: 2
+          }}>
             {item.asset_type?.description || item.asset_type?.name} • {item.asset_category?.description || item.asset_category?.name}
           </Text>
           {item.identifier && (
-            <Text style={{ fontSize: 12, color: '#999' }}>
+            <Text style={{
+              fontSize: 12,
+              color: Colors.light.textSecondary
+            }}>
               {item.identifier}
             </Text>
           )}
         </View>
-        
-        <Ionicons name="chevron-forward" size={16} color="#c7c7cc" />
       </View>
+      
+      <Ionicons name="chevron-forward" size={16} color="#c7c7cc" />
     </Pressable>
   );
 
@@ -130,38 +138,39 @@ export default function BeniScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f2f2f7' }}>
-      <View style={{ flex: 1, padding: 16 }}>
+      <View style={{ flex: 1 }}>
         <View style={{ 
           flexDirection: 'row', 
           alignItems: 'center', 
-          justifyContent: 'space-between',
-          marginBottom: 24 
+          justifyContent: 'space-between', 
+          paddingHorizontal: 16,
+          paddingTop: 16,
+          paddingBottom: 8
         }}>
-          <Text style={{ fontSize: 28, fontWeight: '800' }}>
+          <Text style={{ 
+            fontSize: 32, 
+            fontWeight: '800',
+            color: Colors.light.text
+          }}>
             I miei beni
           </Text>
-          <Pressable
-            onPress={() => setShowAddModal(true)}
+          <Pressable 
+            onPress={() => setShowAddModal(true)} 
             style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
               backgroundColor: Colors.light.tint,
+              width: 36,
+              height: 36,
+              borderRadius: 18,
               alignItems: 'center',
-              justifyContent: 'center',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.2,
-              shadowRadius: 4,
-              elevation: 4
+              justifyContent: 'center'
             }}
           >
-            <Ionicons name="add" size={24} color="#fff" />
+            <Ionicons name="add" size={20} color="#fff" />
           </Pressable>
         </View>
 
-        {/* Barra di ricerca */}
-        <View style={{ paddingHorizontal: 0, paddingBottom: 8 }}>
+        {/* Search */}
+        <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
           <View style={{
             backgroundColor: '#e5e5ea',
             borderRadius: 10,
@@ -177,7 +186,7 @@ export default function BeniScreen() {
               style={{ 
                 flex: 1, 
                 fontSize: 17,
-                color: '#000000',
+                color: Colors.light.text,
                 paddingVertical: 4
               }}
               placeholder="Cerca"
@@ -191,57 +200,77 @@ export default function BeniScreen() {
           </View>
         </View>
 
-        {assets.length === 0 ? (
+        {/* Assets List */}
+        <ScrollView
+          style={{ flex: 1 }}
+          contentContainerStyle={{ paddingBottom: 100, paddingHorizontal: 16 }}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={Colors.light.tint}
+            />
+          }
+        >
+          {assets.length === 0 ? (
           <View style={{ 
             flex: 1, 
-            justifyContent: 'center', 
-            alignItems: 'center',
-            paddingHorizontal: 32
+            alignItems: 'center', 
+            justifyContent: 'center',
+            paddingVertical: 60
           }}>
-            <View style={{
-              width: 80,
-              height: 80,
-              borderRadius: 40,
-              backgroundColor: '#e5e5ea',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 16
+            <Ionicons name="cube-outline" size={60} color={Colors.light.textSecondary} />
+            <Text style={{ 
+              fontSize: 18, 
+              fontWeight: '600',
+              color: Colors.light.textSecondary,
+              marginTop: 16,
+              textAlign: 'center'
             }}>
-              <Ionicons name="cube-outline" size={32} color="#999" />
-            </View>
-            <Text style={{ fontSize: 18, fontWeight: '600', marginBottom: 8, textAlign: 'center' }}>
-              Nessun bene ancora
+              {searchQuery ? 'Nessun bene trovato' : 'Nessun bene caricato'}
             </Text>
-            <Text style={{ fontSize: 16, color: '#666', textAlign: 'center', lineHeight: 24 }}>
-              Inizia ad aggiungere i tuoi beni per tenerli tracciati e gestire le relative scadenze
-            </Text>
-            <Pressable
-              onPress={() => setShowAddModal(true)}
-              style={{
-                marginTop: 24,
-                paddingHorizontal: 24,
-                paddingVertical: 12,
-                backgroundColor: Colors.light.tint,
-                borderRadius: 8
-              }}
-            >
-              <Text style={{ color: '#fff', fontWeight: '600' }}>
-                Aggiungi il primo bene
+            {!searchQuery && (
+              <Text style={{ 
+                fontSize: 14,
+                color: Colors.light.textSecondary,
+                marginTop: 8,
+                textAlign: 'center'
+              }}>
+                Tocca + per aggiungere il tuo primo bene
               </Text>
-            </Pressable>
+            )}
           </View>
         ) : (
-          <FlatList
-            data={filteredAssets}
-            renderItem={renderAsset}
-            keyExtractor={(item) => item.id}
-            showsVerticalScrollIndicator={false}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            contentContainerStyle={{ paddingBottom: 20 }}
-          />
+          <View style={{
+            backgroundColor: Colors.light.cardBackground,
+            borderRadius: 16,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.05,
+            shadowRadius: 1,
+            elevation: 1,
+            marginBottom: 24
+          }}>
+            {filteredAssets.map((asset, index) => {
+              const isLast = index === filteredAssets.length - 1;
+              return (
+                <View key={asset.id}>
+                  {renderAsset({ item: asset })}
+                  {!isLast && (
+                    <View style={{
+                      height: 0.33,
+                      backgroundColor: Colors.light.border,
+                      marginLeft: 0,
+                      marginRight: 0
+                    }} />
+                  )}
+                </View>
+              );
+            })}
+          </View>
         )}
+        </ScrollView>
       </View>
 
       <AddAssetModal

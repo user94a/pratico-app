@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/Colors';
-import { api } from '@/lib/api';
+import { getUserProfile, auth } from '@/lib/api';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
@@ -26,22 +26,10 @@ export default function Impostazioni() {
 
   async function loadUserData() {
     try {
-      const { data: { user } } = await api.auth.getUser();
-      setEmail(user?.email ?? null);
-      
-      // Carica i dati del profilo utente se esistono
-      if (user) {
-        const { data: profile } = await api
-          .from('user_profiles')
-          .select('nome, cognome')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (profile) {
-          setNome(profile.nome || '');
-          setCognome(profile.cognome || '');
-        }
-      }
+      const profile = await getUserProfile();
+      setEmail(profile.email);
+      setNome(profile.name || '');
+      setCognome(profile.surname || '');
     } catch (error) {
       console.log('Errore caricamento profilo:', error);
     }
@@ -62,7 +50,7 @@ export default function Impostazioni() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await api.auth.signOut();
+              await auth.signOut();
               router.replace('/login');
             } catch (error: any) {
               Alert.alert('Errore', error.message);

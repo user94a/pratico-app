@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/Colors';
-import { supabase } from '@/lib/api';
+import { getUserProfile, updateUserProfile } from '@/lib/api';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -18,21 +18,10 @@ export default function ProfileEdit() {
 
   async function loadUserData() {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      setEmail(user?.email ?? null);
-      
-      if (user) {
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('nome, cognome')
-          .eq('user_id', user.id)
-          .single();
-        
-        if (profile) {
-          setNome(profile.nome || '');
-          setCognome(profile.cognome || '');
-        }
-      }
+      const profile = await getUserProfile();
+      setEmail(profile.email);
+      setNome(profile.name || '');
+      setCognome(profile.surname || '');
     } catch (error) {
       console.log('Errore caricamento profilo:', error);
     }
@@ -41,22 +30,11 @@ export default function ProfileEdit() {
   async function handleSaveProfile() {
     try {
       setSaveLoading(true);
-      const { data: { user } } = await supabase.auth.getUser();
       
-      if (!user) throw new Error('Utente non autenticato');
-
-      const { error } = await supabase
-        .from('user_profiles')
-        .upsert({
-          user_id: user.id,
-          nome: nome.trim(),
-          cognome: cognome.trim(),
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'user_id'
-        });
-
-      if (error) throw error;
+      await updateUserProfile({
+        name: nome.trim(),
+        surname: cognome.trim()
+      });
 
       Alert.alert('Successo', 'Profilo aggiornato', [
         { text: 'OK', onPress: () => router.back() }

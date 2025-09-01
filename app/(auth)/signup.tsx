@@ -13,12 +13,11 @@ import {
     ScrollView,
     Text,
     TextInput,
-    View
+    View,
+    Image
 } from 'react-native';
 
 export default function SignUp() {
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -27,14 +26,6 @@ export default function SignUp() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const validateForm = () => {
-    if (!firstName.trim()) {
-      Alert.alert('Errore', 'Inserisci il nome');
-      return false;
-    }
-    if (!lastName.trim()) {
-      Alert.alert('Errore', 'Inserisci il cognome');
-      return false;
-    }
     if (!email.trim()) {
       Alert.alert('Errore', 'Inserisci l\'email');
       return false;
@@ -43,8 +34,19 @@ export default function SignUp() {
       Alert.alert('Errore', 'Inserisci un\'email valida');
       return false;
     }
-    if (password.length < 6) {
-      Alert.alert('Errore', 'La password deve essere di almeno 6 caratteri');
+    if (password.length < 8) {
+      Alert.alert('Errore', 'La password deve essere di almeno 8 caratteri');
+      return false;
+    }
+    
+    // Validazione requisiti Cognito
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumbers = /\d/.test(password);
+    const hasSpecialChar = /[^A-Za-z0-9]/.test(password);
+    
+    if (!hasUpperCase || !hasLowerCase || !hasNumbers || !hasSpecialChar) {
+      Alert.alert('Errore', 'La password deve contenere almeno:\n• Una lettera maiuscola\n• Una lettera minuscola\n• Un numero\n• Un carattere speciale');
       return false;
     }
     if (password !== confirmPassword) {
@@ -60,17 +62,7 @@ export default function SignUp() {
     try {
       setLoading(true);
       
-      const { error } = await api.auth.signUp({
-        email: email.trim(),
-        password,
-        options: {
-          data: {
-            first_name: firstName.trim(),
-            last_name: lastName.trim(),
-            full_name: `${firstName.trim()} ${lastName.trim()}`
-          }
-        }
-      });
+      const { error } = await api.auth.signUp(email.trim(), password);
 
       if (error) throw error;
 
@@ -86,9 +78,7 @@ export default function SignUp() {
                 pathname: '/reset-with-code',
                 params: { 
                   email: email.trim(), 
-                  flow: 'signup',
-                  firstName: firstName.trim(),
-                  lastName: lastName.trim()
+                  flow: 'signup'
                 }
               });
             }
@@ -125,7 +115,15 @@ export default function SignUp() {
                 justifyContent: 'center',
                 marginBottom: 16
               }}>
-                <Ionicons name="cube" size={40} color="#fff" />
+                <Image 
+                  source={require('@/assets/icon.png')}
+                  style={{
+                    width: 65,
+                    height: 65,
+                    borderRadius: 10
+                  }}
+                  resizeMode="contain"
+                />
               </View>
               <Text style={{ 
                 fontSize: 32, 
@@ -146,58 +144,6 @@ export default function SignUp() {
 
             {/* Form */}
             <View style={{ gap: 16 }}>
-              {/* Nome */}
-              <View>
-                <Text style={{ 
-                  fontSize: 14, 
-                  fontWeight: '600', 
-                  color: Colors.light.text,
-                  marginBottom: 8 
-                }}>
-                  Nome
-                </Text>
-                <TextInput
-                  placeholder="Il tuo nome"
-                  value={firstName}
-                  onChangeText={setFirstName}
-                  autoCapitalize="words"
-                  style={{
-                    backgroundColor: '#fff',
-                    borderWidth: 1,
-                    borderColor: '#e1e1e6',
-                    borderRadius: 12,
-                    padding: 16,
-                    fontSize: 16
-                  }}
-                />
-              </View>
-
-              {/* Cognome */}
-              <View>
-                <Text style={{ 
-                  fontSize: 14, 
-                  fontWeight: '600', 
-                  color: Colors.light.text,
-                  marginBottom: 8 
-                }}>
-                  Cognome
-                </Text>
-                <TextInput
-                  placeholder="Il tuo cognome"
-                  value={lastName}
-                  onChangeText={setLastName}
-                  autoCapitalize="words"
-                  style={{
-                    backgroundColor: '#fff',
-                    borderWidth: 1,
-                    borderColor: '#e1e1e6',
-                    borderRadius: 12,
-                    padding: 16,
-                    fontSize: 16
-                  }}
-                />
-              </View>
-
               {/* Email */}
               <View>
                 <Text style={{ 
@@ -237,7 +183,7 @@ export default function SignUp() {
                 </Text>
                 <View style={{ position: 'relative' }}>
                   <TextInput
-                    placeholder="Almeno 6 caratteri"
+                    placeholder="Almeno 8 caratteri con maiuscole, minuscole, numeri e simboli"
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry={!showPassword}

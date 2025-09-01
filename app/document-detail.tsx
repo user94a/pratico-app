@@ -273,7 +273,7 @@ export default function DocumentDetail() {
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.light.background }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <Text style={{ color: Colors.light.textSecondary }}>Caricamento...</Text>
         </View>
@@ -283,7 +283,7 @@ export default function DocumentDetail() {
 
   if (!document) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.light.background }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
           <Text style={{ color: Colors.light.textSecondary }}>Documento non trovato</Text>
         </View>
@@ -292,7 +292,7 @@ export default function DocumentDetail() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.light.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#fff' }}>
       {/* Header */}
       <View style={{
         flexDirection: 'row',
@@ -322,11 +322,12 @@ export default function DocumentDetail() {
           fontSize: 17,
           fontWeight: '600',
           color: Colors.light.text,
-          flex: 1,
           textAlign: 'center',
-          marginHorizontal: 16
+          position: 'absolute',
+          left: 0,
+          right: 0
         }}>
-          {isEditing ? 'Modifica Documento' : document.title}
+          Dettaglio Documento
         </Text>
 
         {isEditing ? (
@@ -353,7 +354,7 @@ export default function DocumentDetail() {
       </View>
 
       <ScrollView 
-        style={{ flex: 1 }} 
+        style={{ flex: 1, backgroundColor: '#f2f2f7' }} 
         contentContainerStyle={{ paddingHorizontal: 16 }}
         showsVerticalScrollIndicator={false}
       >
@@ -407,65 +408,7 @@ export default function DocumentDetail() {
           </View>
         </View>
 
-        {/* Azioni */}
-        <View style={{ marginBottom: 16 }}>
-          <View style={{
-            backgroundColor: Colors.light.cardBackground,
-            borderRadius: 16,
-            padding: 16,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.05,
-            shadowRadius: 1,
-            elevation: 1
-          }}>
-            <Pressable
-              onPress={handleShare}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingVertical: 12,
-                borderBottomWidth: 0.33,
-                borderBottomColor: Colors.light.border
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="share-outline" size={20} color={Colors.light.tint} />
-                <Text style={{
-                  fontSize: 16,
-                  color: Colors.light.text,
-                  marginLeft: 12
-                }}>
-                  Condividi
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.light.textSecondary} />
-            </Pressable>
 
-            <Pressable
-              onPress={handleDelete}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingVertical: 12
-              }}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-                <Text style={{
-                  fontSize: 16,
-                  color: '#FF3B30',
-                  marginLeft: 12
-                }}>
-                  Elimina
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={16} color={Colors.light.textSecondary} />
-            </Pressable>
-          </View>
-        </View>
 
         {/* Informazioni */}
         <View style={{ marginBottom: 16 }}>
@@ -493,9 +436,7 @@ export default function DocumentDetail() {
               flexDirection: 'row',
               alignItems: 'center',
               justifyContent: 'space-between',
-              paddingVertical: 8,
-              borderBottomWidth: 0.33,
-              borderBottomColor: Colors.light.border
+              paddingVertical: 8
             }}>
               <Text style={{
                 fontSize: 16,
@@ -706,6 +647,66 @@ export default function DocumentDetail() {
             </View>
           </View>
         )}
+
+        {/* Azioni */}
+        <View style={{ marginBottom: 16 }}>
+          <View style={{
+            backgroundColor: Colors.light.cardBackground,
+            borderRadius: 16,
+            padding: 16,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.05,
+            shadowRadius: 1,
+            elevation: 1
+          }}>
+            <Pressable
+              onPress={handleShare}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingVertical: 12,
+                borderBottomWidth: 0.33,
+                borderBottomColor: Colors.light.border
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="share-outline" size={20} color={Colors.light.tint} />
+                <Text style={{
+                  fontSize: 16,
+                  color: Colors.light.text,
+                  marginLeft: 12
+                }}>
+                  Condividi
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.light.textSecondary} />
+            </Pressable>
+
+            <Pressable
+              onPress={handleDelete}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingVertical: 12
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+                <Text style={{
+                  fontSize: 16,
+                  color: '#FF3B30',
+                  marginLeft: 12
+                }}>
+                  Elimina
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.light.textSecondary} />
+            </Pressable>
+          </View>
+        </View>
       </ScrollView>
 
       {/* Image Viewer */}

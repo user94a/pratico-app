@@ -17,45 +17,31 @@ import {
 } from 'react-native';
 import { api } from '@/lib/api';
 
-export default function Login() {
+export default function ForgotPassword() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState<'in' | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  async function signIn() {
-    console.log('signIn called with:', { email, password: password ? '***' : 'empty' });
-    
-    if (!email || !password) {
-      console.log('Validation failed - missing email or password');
-      return Alert.alert('Errore', 'Compila email e password');
+  async function sendResetCode() {
+    if (!email) {
+      return Alert.alert('Errore', 'Inserisci l\'indirizzo email');
     }
-    
+
     try {
-      console.log('Starting login process...');
-      setLoading('in');
-      const { error } = await api.auth.signInWithPassword({ email, password });
-      if (error) {
-        console.log('Login error:', error);
-        throw error;
-      }
-      console.log('Login successful');
-      // onAuthStateChange in app/index.tsx farà il redirect, ma aggiungiamo un backup
-      setTimeout(() => {
-        router.replace('/(tabs)/scadenze');
-      }, 100);
+      setLoading(true);
+      const { error } = await api.auth.resetPasswordForEmail(email);
+      if (error) throw error;
+
+      Alert.alert('Codice inviato', 'Abbiamo inviato un codice di 6 cifre alla tua email.', [
+        {
+          text: 'Ok',
+          onPress: () => router.push({ pathname: '/reset-with-code', params: { email, flow: 'recovery' } }),
+        },
+      ]);
     } catch (e: any) {
-      console.log('Login error:', e);
-      Alert.alert('Errore accesso', e.message);
+      Alert.alert('Errore', e.message);
     } finally {
-      setLoading(null);
+      setLoading(false);
     }
-  }
-
-
-
-  function goToForgotPassword() {
-    router.push('/forgot-password');
   }
 
   return (
@@ -95,16 +81,17 @@ export default function Login() {
                 fontSize: 32, 
                 fontWeight: '800', 
                 color: Colors.light.text,
-                marginBottom: 8
+                marginBottom: 8,
+                textAlign: 'center'
               }}>
-                Benvenuto
+                Password dimenticata
               </Text>
               <Text style={{ 
                 fontSize: 16, 
                 color: Colors.light.textSecondary,
                 textAlign: 'center'
               }}>
-                Accedi al tuo account
+                Inserisci la tua email per ricevere il codice di recupero
               </Text>
             </View>
 
@@ -136,73 +123,13 @@ export default function Login() {
                   }}
                 />
               </View>
-
-              {/* Password */}
-              <View>
-                <Text style={{ 
-                  fontSize: 14, 
-                  fontWeight: '600', 
-                  color: Colors.light.text,
-                  marginBottom: 8 
-                }}>
-                  Password
-                </Text>
-                <View style={{ position: 'relative' }}>
-                  <TextInput
-                    placeholder="Password"
-                    secureTextEntry={!showPassword}
-                    value={password}
-                    onChangeText={setPassword}
-                    style={{
-                      backgroundColor: '#fff',
-                      borderWidth: 1,
-                      borderColor: '#e1e1e6',
-                      borderRadius: 12,
-                      padding: 16,
-                      paddingRight: 50,
-                      fontSize: 16
-                    }}
-                  />
-                  <Pressable
-                    onPress={() => setShowPassword(!showPassword)}
-                    style={{
-                      position: 'absolute',
-                      right: 16,
-                      top: 16,
-                      padding: 4
-                    }}
-                  >
-                    <Ionicons 
-                      name={showPassword ? 'eye-off' : 'eye'} 
-                      size={20} 
-                      color={Colors.light.textSecondary} 
-                    />
-                  </Pressable>
-                </View>
-              </View>
-
-              {/* Password dimenticata */}
-              <View style={{ alignItems: 'flex-end' }}>
-                <Pressable
-                  onPress={goToForgotPassword}
-                  disabled={loading !== null}
-                  style={{ paddingVertical: 4 }}
-                >
-                  <Text style={{ color: Colors.light.tint, fontWeight: '600' }}>
-                    Password dimenticata?
-                  </Text>
-                </Pressable>
-              </View>
             </View>
 
             {/* Pulsanti */}
             <View style={{ gap: 12, marginTop: 32 }}>
               <Pressable
-                onPress={() => {
-                  console.log('Login button pressed');
-                  signIn();
-                }}
-                disabled={loading !== null}
+                onPress={sendResetCode}
+                disabled={loading}
                 style={{
                   backgroundColor: loading ? '#80a8ff' : Colors.light.tint,
                   padding: 16,
@@ -211,7 +138,7 @@ export default function Login() {
                   opacity: loading ? 0.8 : 1
                 }}
               >
-                {loading === 'in' ? (
+                {loading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text style={{
@@ -219,30 +146,26 @@ export default function Login() {
                     fontSize: 16,
                     fontWeight: '600'
                   }}>
-                    Accedi
+                    Invia codice recupero
                   </Text>
                 )}
               </Pressable>
 
               <Pressable
-                onPress={() => router.push('/signup')}
-                disabled={loading !== null}
+                onPress={() => router.back()}
+                disabled={loading}
                 style={{
-                  backgroundColor: '#fff',
                   padding: 16,
-                  borderRadius: 12,
                   alignItems: 'center',
-                  borderWidth: 1,
-                  borderColor: '#e1e1e6',
                   opacity: loading ? 0.5 : 1
                 }}
               >
                 <Text style={{
-                  color: Colors.light.tint,
+                  color: Colors.light.textSecondary,
                   fontSize: 16,
                   fontWeight: '600'
                 }}>
-                  Crea Account
+                  Torna al login
                 </Text>
               </Pressable>
             </View>
