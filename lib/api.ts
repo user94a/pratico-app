@@ -11,6 +11,15 @@ const envUrl = process.env.EXPO_PUBLIC_API_URL;
 const extraUrl = Constants.expoConfig?.extra?.apiUrl;
 const API_URL = envUrl || extraUrl || 'http://localhost:3001/api';
 
+// Helper function to convert relative URLs to absolute URLs
+export const makeAbsoluteUrl = (relativeUrl: string): string => {
+  if (relativeUrl.startsWith('http')) {
+    return relativeUrl; // Already absolute
+  }
+  const baseUrl = API_URL.replace('/api', ''); // Remove /api suffix to get base server URL
+  return `${baseUrl}${relativeUrl}`;
+};
+
 // Recurrence templates for deadlines
 export const RECURRENCE_TEMPLATES = {
   daily: { label: 'Ogni giorno', rule: 'RRULE:FREQ=DAILY' },

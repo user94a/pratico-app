@@ -1,5 +1,5 @@
 import { Colors } from '@/constants/Colors';
-import { deleteDocument, getDocument } from '@/lib/api';
+import { deleteDocument, getDocument, makeAbsoluteUrl } from '@/lib/api';
 import { Document } from '@/lib/types';
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -160,18 +160,23 @@ export default function DocumentDetail() {
         console.log('🔍 DEBUG - file type:', data.file_type);
         
         // Per ora gestiamo un singolo file
-        const fileUrl = data.file_url;
+        const relativeUrl = data.file_url;
         const fileType = data.file_type;
         const fileName = data.title || 'documento';
         
+        // Costruisci URL assoluto usando la helper function
+        const absoluteUrl = makeAbsoluteUrl(relativeUrl);
+        
+        console.log('🔍 DEBUG - URL assoluto costruito:', absoluteUrl);
+        
         if (fileType === 'image') {
-          setImageUrls([fileUrl]);
+          setImageUrls([absoluteUrl]);
           setPdfFiles([]);
-          console.log('✅ Immagine aggiunta:', fileName, fileUrl);
+          console.log('✅ Immagine aggiunta:', fileName, absoluteUrl);
         } else if (fileType === 'pdf') {
           setImageUrls([]);
-          setPdfFiles([fileUrl]);
-          console.log('✅ PDF aggiunto:', fileName, fileUrl);
+          setPdfFiles([absoluteUrl]);
+          console.log('✅ PDF aggiunto:', fileName, absoluteUrl);
         } else {
           console.log('❌ Tipo di file non riconosciuto:', fileType);
           setImageUrls([]);
@@ -244,7 +249,10 @@ export default function DocumentDetail() {
         return;
       }
 
-      await Sharing.shareAsync(document.file_url);
+      // Costruisci URL assoluto per la condivisione
+      const absoluteUrl = makeAbsoluteUrl(document.file_url);
+
+      await Sharing.shareAsync(absoluteUrl);
     } catch (error) {
       console.error('Errore nella condivisione:', error);
       Alert.alert('Errore', 'Impossibile condividere il documento');
